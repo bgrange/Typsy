@@ -13,12 +13,12 @@ exception BadList of exp
    slightly different from the way values are defined in the 
    substitution-based interpreter.  Rhetorical question:  Why is that?
    Notice also that Cons(v1,v2) is a value (if v1 and v2 are both values).
-*) 
+  *)
 let rec is_value (e:exp) : bool = 
   match e with
       Constant _ -> true  
     | Pair (e1, e2) -> is_value e1 && is_value e2
-    | EmptyList -> true
+    | EmptyList _ -> true
     | Cons (e1, e2) -> is_value e1 && is_value e2
     | Closure _ -> true
     | _ -> false
@@ -50,7 +50,7 @@ let free_vars (e:exp) : variable list =
               (aux e2 bound)
     | Fst p -> aux p bound
     | Snd p -> aux p bound
-    | EmptyList -> [] 
+    | EmptyList _ -> [] 
     | Cons (hd,tl) -> 
         union (aux hd bound)
               (aux tl bound)
@@ -58,7 +58,7 @@ let free_vars (e:exp) : variable list =
         union (union (aux e1 bound)
                      (aux e2 bound))
                      (aux e3 (x_hd::x_tl::bound))
-    | Rec (name,arg,body) ->
+    | Rec (name,arg,_,_,body) ->
         aux body (name::arg::bound)
     | Closure _ -> [] 
     | App (e1,e2) ->  
@@ -94,23 +94,23 @@ let eval_body (env:env) (eval_loop:env -> exp -> exp) (e:exp) : exp =
         (match eval_loop env p with
            Pair(_, second) -> second
          | _ -> raise (BadPair p))
-    | EmptyList -> e
+    | EmptyList _ -> e
     | Cons (e1,e2) ->
         let hd = eval_loop env e1 in
         let tl = eval_loop env e2 in
         (match tl with
-           EmptyList | Cons _ -> Cons (hd,tl)
+           EmptyList _ | Cons _ -> Cons (hd,tl)
          | _ -> raise (BadList tl))
     | Match (e1, e2, x_hd, x_tl, e3) ->
         let v1 = eval_loop env e1 in
         (match v1 with
-           EmptyList -> eval_loop env e2
+           EmptyList _ -> eval_loop env e2
          | Cons (v_hd, v_tl) ->
              let env' = update_env env x_hd v_hd in
              let env'' = update_env env' x_tl v_tl in
              eval_loop env'' e3
          | _ -> raise (BadList v1))
-    | Rec (f,arg,body) ->
+    | Rec (f,arg,_,_,body) ->
         let frees = free_vars e in
         let env' = List.filter
                      (fun (x,_) -> 

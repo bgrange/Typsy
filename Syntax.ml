@@ -25,6 +25,13 @@ type operator = Plus | Minus | Times | Div | Less | LessEq
 
 *)
 
+type typ =   BoolTyp
+	   | IntTyp
+	   | FunTyp of typ * typ
+	   | PairTyp of typ * typ				
+	   | ListTyp of typ
+	   | VarTyp of variable
+						      
 type exp = 
 
   (* Basic *)
@@ -40,12 +47,12 @@ type exp =
   | Snd of exp
 
   (* Lists *)
-  | EmptyList
+  | EmptyList of typ
   | Cons of exp * exp  
   | Match of exp * exp * variable * variable * exp  
 
   (* Recursive functions *)
-  | Rec of variable * variable * exp
+  | Rec of variable * variable * typ * typ * exp
   | Closure of env * variable * variable * exp 
   | App of exp * exp
 

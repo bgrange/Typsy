@@ -9,6 +9,7 @@
 open Syntax
 open Printing
 
+
 (************)
 (* INTEGERS *)
 (************)
@@ -28,15 +29,15 @@ let four = Constant (Int 4)
 let clo =  
   Let ("z", two,
        App (Let ("x", three, 
-		 Rec ("f", "y", 
+		 Rec ("f", "y", IntTyp,IntTyp,
 		      Op (Var "x", Plus, Op (Var "y", Plus, Var "z")))),
 	    Let ("x", four, Op (Var "x", Plus, Var "z"))
        )
-  )
+      )
 
 (* rec fact n = if n < 1 then 1 else n * fact (n - 1) *)
 let fact = 
-  Rec ("fact", "n", 
+  Rec ("fact", "n", IntTyp,IntTyp,
        If (Op (Var "n", Less, one),
            one,
            Op (Var "n", Times, 
@@ -57,7 +58,7 @@ let p1 = Pair (one, two)
        let swap p = let (x,y) = p in (y,x)
 *)
 let swap = 
-  Rec ("swap", "p",
+  Rec ("swap", "p", PairTyp (IntTyp,IntTyp),PairTyp (IntTyp,IntTyp),
        Let ("x", Fst (Var "p"),
        Let ("y", Snd (Var "p"),
        Pair(Var "y", Var "x"))))
@@ -74,7 +75,7 @@ let swap_p1 = App (swap, p1)
 *)
 let rec listify (l:exp list) : exp =
   match l with
-      [] -> EmptyList
+      [] -> EmptyList IntTyp
     | hd::tl -> Cons(hd,listify tl)
 
 (* a list of 4 numbers *)
@@ -85,7 +86,7 @@ let list4 = listify [one;two;three;four]
  *     [] -> 0
  *   | hd::tl -> hd + sumlist tl *)
 let sumlist = 
-  Rec ("sumlist", "l", 
+  Rec ("sumlist", "l", ListTyp IntTyp, IntTyp,
        Match (Var "l",
            zero,
            "hd", "tl", Op (Var "hd", Plus, 
@@ -107,17 +108,18 @@ let sl4 = App (sumlist, list4)
    the function map : ('a -> 'b) -> 'a list -> 'b list 
  *)
 let map =
-  Rec ("map", "f",
-    Rec ("mapf", "l",
+  Rec ("map", "f", FunTyp(IntTyp,IntTyp), FunTyp(ListTyp IntTyp,ListTyp IntTyp),
+    Rec ("mapf", "l", ListTyp IntTyp, ListTyp IntTyp,
       Match (Var "l",
-                    EmptyList,
+                    EmptyList IntTyp,
         "hd", "tl", Cons (App (Var "f", Var "hd"),
                           App (Var "mapf", Var "tl")))))
     
 (* Replace the constant "one" below with your implementation of 
    a function "incr" that adds one to an integer *)
 let incr : exp =
-  Rec ("incr", "x", Op (Var "x", Plus, Constant (Int 1)))
+  Rec ("incr", "x", IntTyp,IntTyp,
+       Op (Var "x", Plus, Constant (Int 1)))
 ;;
 
 (* Use incr and map, defined above to implement the function incr_all
@@ -140,14 +142,14 @@ let incr_all = App (map, incr) ;;
 
 let sum_pairs =
   App (map,
-       Rec ("sum_pair", "p", 
+       Rec ("sum_pair", "p", PairTyp (IntTyp,IntTyp),IntTyp,
             Op (Fst (Var "p"), Plus, Snd (Var "p"))))
 ;;
 
 (* Equivalent Ocaml: *)
 let times5 =
   Let ("y", Constant (Int 5),
-    Rec ("times5", "n", 
+    Rec ("times5", "n", IntTyp,IntTyp,
       If (Op (Var "n", LessEq, Constant (Int 0)), Constant (Int 0), 
           Op (Var "y", Plus,
               Let ("y", Constant (Int 4), 
@@ -159,7 +161,7 @@ let app_times5 =
   App (times5, Constant (Int 6))
 ;;
 
-let p = Pair(Constant (Int 1), Constant (Bool true)) ;;
+(*let p = Pair(Constant (Int 1), Constant (Bool true)) ;;
 
 let first = Fst p ;;
 let second = Snd p ;;
@@ -185,7 +187,7 @@ let to_pair ((n1,n2):int*int) : exp =
 ;;
 
 let pairs = listify (List.map to_pair [(1,2);(2,3);(3,4)]) ;;
-
+ *)
 (*********)
 (* TESTS *)
 (*********)
@@ -193,11 +195,16 @@ let pairs = listify (List.map to_pair [(1,2);(2,3);(3,4)]) ;;
 (* Feel free to add many more tests of your own to the list *)
 let tests = [zero; fact; fact4; list4; sl4; clo; incr_all;
 		App (incr_all,list4); app_times5;
-		p; first; second; zip; app_zip; App(sum_pairs, pairs)]
+		(*p; first; second; zip; app_zip; App(sum_pairs, pairs)*)
+		]
 
 let run_test eval exp =
   Printf.printf "========\n";
   Printf.printf "%s\n" (string_of_exp exp);
+  (try
+    Printf.printf "%s\n" ("Has type: " ^ (string_of_typ (Typecheck.typeof exp)))
+  with Typecheck.Type_error err ->
+    Printf.printf "%s\n" err);
   Printf.printf "Evaluates to:\n";
   Printf.printf "%s\n" (string_of_exp (eval exp));
   Printf.printf "========\n"

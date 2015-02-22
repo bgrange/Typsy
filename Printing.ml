@@ -34,7 +34,7 @@ let precedence e =
     | Fst _ -> 2
     | Snd _ -> 2
 
-    | EmptyList -> 0
+    | EmptyList _ -> 0
     | Cons _ -> 8
     | Match _ -> max_prec
 
@@ -72,14 +72,14 @@ and exp2string prec e =
       | Fst e1 ->  "fst " ^ (exp2string p e1)
       | Snd e1 ->  "snd " ^ (exp2string p e1)
 
-      | EmptyList -> "[]"
+      | EmptyList _ -> "[]"
       | Cons (e1,e2) -> (exp2string p e1) ^ "::" ^ (exp2string prec e2) 
       | Match (e1,e2,hd,tl,e3) -> 
 	  "match " ^ (exp2string max_prec e1) ^ 
 	    " with [] -> " ^ (exp2string max_prec e2) ^ 
             " | " ^ hd ^ "::" ^ tl ^ " -> " ^ (exp2string p e3)
 
-      | Rec (f,x,body) -> "rec "^f^" "^x^" = "^(exp2string max_prec body)
+      | Rec (f,x,_,_,body) -> "rec "^f^" "^x^" = "^(exp2string max_prec body)
       | Closure (env,f,x,body) -> 
 	  "closure "^env2string env^" "^f^" "^x^" = "^(exp2string max_prec body)
       | App (e1,e2) -> (exp2string p e1)^" "^(exp2string p e2)
@@ -89,3 +89,12 @@ and exp2string prec e =
 
 let string_of_exp e = exp2string max_prec e 
 let string_of_env env = env2string env
+
+let rec string_of_typ typ =
+  match typ with
+  | BoolTyp -> "bool"
+  | IntTyp -> "int"
+  | FunTyp (a,b) -> "(" ^ (string_of_typ a) ^ " -> " ^ (string_of_typ b) ^ ")"
+  | PairTyp (a,b) -> "(" ^ (string_of_typ a) ^ " * " ^ (string_of_typ b) ^ ")"
+  | ListTyp a -> "[" ^ (string_of_typ a) ^ "]"
+  | VarTyp v -> v					     
