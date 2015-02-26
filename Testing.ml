@@ -6,7 +6,7 @@
    You will have to construct some additional tests yourself.  See below.
  *)
 
-open Syntax
+open TypedSyntax
 open Printing
 
 
@@ -73,10 +73,10 @@ let swap_p1 = App (swap, p1)
 (* takes an OCaml list of expressions and generates a single expression
    representing the list
 *)
-let rec listify (l:exp list) : exp =
+let rec listify (l:exp list) (t:typ) : exp =
   match l with
-      [] -> EmptyList IntTyp
-    | hd::tl -> Cons(hd,listify tl)
+      [] -> EmptyList t
+    | hd::tl -> Cons(hd,listify tl t)
 
 (* a list of 4 numbers *)
 let list4 = listify [one;two;three;four] 

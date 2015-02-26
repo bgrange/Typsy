@@ -2,6 +2,6 @@
 (* Conversion of dynamic ml syntax in to strings *)
 (*************************************************)
 
-val string_of_exp : Syntax.exp -> string
-val string_of_env : Syntax.env -> string
-val string_of_typ : Syntax.typ -> string
+val string_of_exp : TypedSyntax.exp -> string
+(*val string_of_env : TypedSyntax.env -> string*)
+val string_of_typ : TypedSyntax.typ -> string

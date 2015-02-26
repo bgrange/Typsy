@@ -1,4 +1,4 @@
-open Syntax
+open TypedSyntax
 
 let string_of_const c = 
   match c with 
@@ -42,6 +42,11 @@ let precedence e =
     | Closure _ -> max_prec
     | App _ ->  2
 
+    | TypLam _ -> max_prec
+    | TypClosure _ -> max_prec		    
+    | TypApp _ -> 2
+
+(*		    
 let rec env2string env =
   let elem2string x v = x ^ "=" ^ exp2string max_prec v in
   let rec aux env =
@@ -51,8 +56,8 @@ let rec env2string env =
       | (x,v)::rest -> elem2string x v ^ ";" ^ aux rest 
   in
   "[" ^ aux env ^ "]"
-
-and exp2string prec e = 
+		  *)
+let rec exp2string prec e = 
   let p = precedence e in 
   let s = 
     match e with 
@@ -80,15 +85,17 @@ and exp2string prec e =
             " | " ^ hd ^ "::" ^ tl ^ " -> " ^ (exp2string p e3)
 
       | Rec (f,x,_,_,body) -> "rec "^f^" "^x^" = "^(exp2string max_prec body)
-      | Closure (env,f,x,body) -> 
-	  "closure "^env2string env^" "^f^" "^x^" = "^(exp2string max_prec body)
+      | Closure (env,f,x,body) -> "" 
+      (*	  "closure "^env2string env^" "^f^" "^x^" = "^(exp2string max_prec body) *)
       | App (e1,e2) -> (exp2string p e1)^" "^(exp2string p e2)
+      | _ -> ""					       
+					       
 
   in 
     if p > prec then "(" ^ s ^ ")" else s
 
 let string_of_exp e = exp2string max_prec e 
-let string_of_env env = env2string env
+(*let string_of_env env = env2string env*)
 
 let rec string_of_typ typ =
   match typ with
@@ -97,4 +104,5 @@ let rec string_of_typ typ =
   | FunTyp (a,b) -> "(" ^ (string_of_typ a) ^ " -> " ^ (string_of_typ b) ^ ")"
   | PairTyp (a,b) -> "(" ^ (string_of_typ a) ^ " * " ^ (string_of_typ b) ^ ")"
   | ListTyp a -> "[" ^ (string_of_typ a) ^ "]"
-  | VarTyp v -> v					     
+  | VarTyp v -> v
+  | Forall (v,t) -> "forall " ^ v ^ ", " ^ (string_of_typ t)

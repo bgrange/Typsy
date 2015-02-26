@@ -1,4 +1,4 @@
-TESTFILES = Syntax.ml Printing.mli Printing.ml EvalUtil.mli EvalUtil.ml EvalEnv.mli EvalEnv.ml EvalSubst.mli EvalSubst.ml  Testing.ml Main.ml
+TESTFILES = TypedSyntax.ml Printing.mli Printing.ml Util.mli Eval.mli Eval.ml  Testing.ml Main.ml
 
 testing: $(EVALTESTFILES)
 	ocamlbuild Main.d.byte

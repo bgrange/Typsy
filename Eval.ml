@@ -2,18 +2,41 @@
 (* An environment-based evaluator for Dynamic ML *)
 (*************************************************)
 
-open Syntax
+open TypedSyntax
 open Printing
-open EvalUtil
-
+open Util
+       
 exception BadList of exp
-
+exception UnboundVariable of variable 
+exception BadApplication of exp 
+exception BadIf of exp 
+exception BadMatch of exp 
+exception BadOp of exp * operator * exp 
+exception BadPair of exp
+		       
 (* Defines the subset of expressions considered values
    Notice that closures are values but the rec form is not -- this is
    slightly different from the way values are defined in the 
    substitution-based interpreter.  Rhetorical question:  Why is that?
    Notice also that Cons(v1,v2) is a value (if v1 and v2 are both values).
-  *)
+ *)
+
+let apply_op (v1:exp) (op:operator) (v2:exp) : exp = 
+     match v1, op, v2 with 
+       | Constant (Int i), Plus, Constant (Int j) -> 
+         Constant (Int (i+j))
+       | Constant (Int i), Minus, Constant (Int j) -> 
+         Constant (Int (i-j))
+       | Constant (Int i), Times, Constant (Int j) -> 
+         Constant (Int (i*j))
+       | Constant (Int i), Div, Constant (Int j) -> 
+         Constant (Int (i/j))
+       | Constant (Int i), Less, Constant (Int j) -> 
+         Constant (Bool (i<j))
+       | Constant (Int i), LessEq, Constant (Int j) -> 
+         Constant (Bool (i<=j))
+       | _, _, _ -> raise (BadOp (v1,op,v2))
+			  
 let rec is_value (e:exp) : bool = 
   match e with
       Constant _ -> true  
@@ -21,57 +44,20 @@ let rec is_value (e:exp) : bool =
     | EmptyList _ -> true
     | Cons (e1, e2) -> is_value e1 && is_value e2
     | Closure _ -> true
+    | TypClosure _ -> true		     
     | _ -> false
 
-let free_vars (e:exp) : variable list =
-  let add_no_dups xs x =
-    if List.exists (var_eq x) xs then xs
-    else x::xs
-  in
-  let union xs ys = List.fold_left add_no_dups xs ys in
-  let rec aux e bound =
-    match e with
-      Var x ->
-        if List.exists (var_eq x) bound then [] 
-        else [x]
-    | Constant _ -> []
-    | Op (e1,op,e2) ->
-        union (aux e1 bound)
-              (aux e2 bound)
-    | If (e1,e2,e3) ->
-        union (union (aux e1 bound)
-                     (aux e2 bound))
-                     (aux e3 bound)
-    | Let (x,e1,e2) ->
-        let free_e1 = aux e1 bound in
-        union free_e1 (aux e2 (x::bound))
-    | Pair (e1,e2) ->
-        union (aux e1 bound)
-              (aux e2 bound)
-    | Fst p -> aux p bound
-    | Snd p -> aux p bound
-    | EmptyList _ -> [] 
-    | Cons (hd,tl) -> 
-        union (aux hd bound)
-              (aux tl bound)
-    | Match (e1,e2,x_hd,x_tl,e3) ->
-        union (union (aux e1 bound)
-                     (aux e2 bound))
-                     (aux e3 (x_hd::x_tl::bound))
-    | Rec (name,arg,_,_,body) ->
-        aux body (name::arg::bound)
-    | Closure _ -> [] 
-    | App (e1,e2) ->  
-        union (aux e1 bound)
-              (aux e2 bound)
-  in aux e []
-;;
-
+let prune_env (env:env) (e:exp) : env =
+  let normal_frees = free_vars e in
+  let tvar_frees = free_tvars e in
+  (List.filter (fun (v,_) -> SS.mem v normal_frees) (fst env),
+   List.filter (fun (v,_) -> SS.mem v tvar_frees) (snd env))
+	     
 (* evaluation; use eval_loop to recursively evaluate subexpressions *)
-let eval_body (env:env) (eval_loop:env -> exp -> exp) (e:exp) : exp = 
+let eval_body (env:env) (eval_loop:env -> exp -> exp) (e:exp) : exp =
   match e with
     | Var x -> 
-      (match lookup_env env x with 
+      (match lookup_exp env x with 
   	  None -> raise (UnboundVariable x)
 	| Some v -> v)
     | Constant _ -> e
@@ -84,7 +70,7 @@ let eval_body (env:env) (eval_loop:env -> exp -> exp) (e:exp) : exp =
            | Constant (Bool true) -> eval_loop env e2
            | Constant (Bool false) -> eval_loop env e3
            | v1 -> raise (BadIf v1))
-    | Let (x,e1,e2) -> eval_loop (update_env env x e1) e2
+    | Let (x,e1,e2) -> eval_loop (update_exp env x e1) e2
     | Pair (e1,e2) -> Pair(eval_loop env e1, eval_loop env e2)
     | Fst p -> 
         (match eval_loop env p with
@@ -106,26 +92,30 @@ let eval_body (env:env) (eval_loop:env -> exp -> exp) (e:exp) : exp =
         (match v1 with
            EmptyList _ -> eval_loop env e2
          | Cons (v_hd, v_tl) ->
-             let env' = update_env env x_hd v_hd in
-             let env'' = update_env env' x_tl v_tl in
+             let env' = update_exp env x_hd v_hd in
+             let env'' = update_exp env' x_tl v_tl in
              eval_loop env'' e3
          | _ -> raise (BadList v1))
     | Rec (f,arg,_,_,body) ->
-        let frees = free_vars e in
-        let env' = List.filter
-                     (fun (x,_) -> 
-                        List.exists (var_eq x) frees) env
-        in Closure (env',f,arg,body)
-    | Closure _ -> e
+        Closure (prune_env env body,f,arg,body)
+    | Closure _ | TypClosure _ -> e
     | App (e1,e2) ->
         let v1 = eval_loop env e1 in
         let v2 = eval_loop env e2 in
         (match v1 with
            Closure (env_cl,f,arg,body) ->
-             let env_cl' = update_env env_cl arg v2 in
-             let env_cl'' = update_env env_cl' f v1 in
+             let env_cl' = update_exp env_cl arg v2 in
+             let env_cl'' = update_exp env_cl' f v1 in
              eval_loop env_cl'' body
          | _ -> raise (BadApplication e))
+    | TypLam (v,e') -> TypClosure (prune_env env e', v, e')
+    | TypApp (e',t) ->
+       let ve' = eval_loop env e' in
+       (match ve' with
+	| TypClosure (env_cl,arg,body) ->
+	   let env_cl' = update_typ env_cl arg t in
+	   eval_loop env_cl' body
+	| _ -> raise (BadApplication e))
 ;;
 
 (* evaluate closed, top-level expression e *)

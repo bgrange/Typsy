@@ -30,6 +30,7 @@ type typ =   BoolTyp
 	   | FunTyp of typ * typ
 	   | PairTyp of typ * typ				
 	   | ListTyp of typ
+	   | Forall of variable * typ
 	   | VarTyp of variable
 						      
 type exp = 
@@ -56,31 +57,30 @@ type exp =
   | Closure of env * variable * variable * exp 
   | App of exp * exp
 
-and env = (variable * exp) list
+  (* Type abstraction/application *)
+  | TypLam of variable * exp
+  | TypApp of exp * typ
+  | TypClosure of env * variable * exp
 
-(*****************************)
-(* Manipulating environments *)
-(*****************************)
- 
-(* empty environment *)
-let empty_env : env = []
+and env = (variable * exp) list * (variable * typ) list
 
-(* lookup_env env x == Some v 
- *   where (x,v) is the most recently added pair (x,v) containing x
- * lookup_env env x == None 
- *   if x does not appear in env *)
-let rec lookup_env (env:env) (x:variable) : exp option =
-  match env with
-    [] -> None
-  | (y,v)::env' -> if var_eq x y then Some v else lookup_env env' x 
-;;
+let empty_env = ([],[])						   
+						   
+let rec lookup (l:(variable * 'a) list) (v:variable) : 'a option =
+  match l with
+  | [] -> None
+  | (w,e)::l' ->
+      if var_eq w v then Some e else lookup l' v
 
-(* update env x v returns a new env containing the pair (x,v) *)
-let rec update_env (env:env) (x:variable) (v:exp) : env =
-  match env with
-    [] -> [(x,v)]
-  | hd::tl ->
-      let (y,_) = hd in
-      if x = y then (x,v)::tl
-      else hd::(update_env tl x v)
-;;
+let lookup_exp (env:env) (v:variable) : exp option =
+  lookup (fst env) v
+
+let lookup_typ (env:env) (v:variable) : typ option =
+  lookup (snd env) v
+
+let update_exp (env:env) (v:variable) (e:exp) : env =
+  ((v,e)::fst env,snd env)
+
+let update_typ (env:env) (v:variable) (t:typ) : env =
+  (fst env,(v,t)::snd env)
+        

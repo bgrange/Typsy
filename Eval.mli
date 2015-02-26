@@ -3,7 +3,7 @@
 (*************************************************)
 
 (* evaluate input to a value *)
-val eval : Syntax.exp -> Syntax.exp
+val eval : TypedSyntax.exp -> TypedSyntax.exp
 
 (* evaluate input to a value while printing intermediate results *)
-val debug_eval : Syntax.exp -> Syntax.exp
+val debug_eval : TypedSyntax.exp -> TypedSyntax.exp
