@@ -30,7 +30,7 @@ let free_tvars (e:exp) : SS.t =
   let rec aux e bound =
     match e with
     | Var _ | Constant _
-    | Closure _ -> SS.empty
+    | Closure _ | RecClosure _ | TypClosure _ -> SS.empty
     | Op (e1,_,e2) | Let (_,e1,e2)
     | Pair(e1,e2) | Cons (e1,e2)
     | App (e1,e2) ->
@@ -45,8 +45,10 @@ let free_tvars (e:exp) : SS.t =
        SS.union (SS. union (_free_tvars_in_typ t1 bound)
 			   (_free_tvars_in_typ t2 bound))
 		(aux e' bound)
+    | Fun (_,t,e') ->
+       SS.union (_free_tvars_in_typ t bound) (aux e' bound)
     | EmptyList t -> _free_tvars_in_typ t bound
-    | TypApp (e',t) -> SS.union (aux e' bound) (_free_tvars_in_typ t bound)				       
+    | TypApp (e',t) -> SS.union (aux e' bound) (_free_tvars_in_typ t bound)
     | TypLam (v,e) -> aux e (SS.add v bound)
   in
   aux e SS.empty
@@ -82,8 +84,10 @@ let free_vars (e:exp) : SS.t =
                  (aux e3 (SS.add x_hd
 				 (SS.add x_tl bound)))
     | Rec (name,arg,_,_,body) ->
-        aux body (SS.add name (SS.add arg bound))
-    | Closure _ -> SS.empty 
+       aux body (SS.add name (SS.add arg bound))
+    | Fun (arg,_,body) ->
+       aux body (SS.add arg bound)
+    | Closure _ | RecClosure _ | TypClosure _  -> SS.empty 
     | App (e1,e2) ->  
         SS.union (aux e1 bound)
                  (aux e2 bound)

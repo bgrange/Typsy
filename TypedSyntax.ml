@@ -52,9 +52,11 @@ type exp =
   | Cons of exp * exp  
   | Match of exp * exp * variable * variable * exp  
 
-  (* Recursive functions *)
+  (* Functions *)
   | Rec of variable * variable * typ * typ * exp
-  | Closure of env * variable * variable * exp 
+  | RecClosure of env * variable * variable * exp
+  | Fun of variable * typ * exp
+  | Closure of env * variable * exp			      
   | App of exp * exp
 
   (* Type abstraction/application *)

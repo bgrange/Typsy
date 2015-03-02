@@ -79,7 +79,7 @@ let rec listify (l:exp list) (t:typ) : exp =
     | hd::tl -> Cons(hd,listify tl t)
 
 (* a list of 4 numbers *)
-let list4 = listify [one;two;three;four] 
+let list4 = listify [one;two;three;four] IntTyp
 
 (* rec sumlist l = 
  *   match l with

@@ -39,7 +39,9 @@ let precedence e =
     | Match _ -> max_prec
 
     | Rec _ -> max_prec
+    | Fun _ -> max_prec		 
     | Closure _ -> max_prec
+    | RecClosure _ -> max_prec		     
     | App _ ->  2
 
     | TypLam _ -> max_prec
@@ -85,7 +87,9 @@ let rec exp2string prec e =
             " | " ^ hd ^ "::" ^ tl ^ " -> " ^ (exp2string p e3)
 
       | Rec (f,x,_,_,body) -> "rec "^f^" "^x^" = "^(exp2string max_prec body)
-      | Closure (env,f,x,body) -> "" 
+      | Fun _ -> ""						     
+      | Closure _ -> ""
+      | RecClosure _ -> ""				    
       (*	  "closure "^env2string env^" "^f^" "^x^" = "^(exp2string max_prec body) *)
       | App (e1,e2) -> (exp2string p e1)^" "^(exp2string p e2)
       | _ -> ""					       

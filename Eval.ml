@@ -97,16 +97,21 @@ let eval_body (env:env) (eval_loop:env -> exp -> exp) (e:exp) : exp =
              eval_loop env'' e3
          | _ -> raise (BadList v1))
     | Rec (f,arg,_,_,body) ->
-        Closure (prune_env env body,f,arg,body)
-    | Closure _ | TypClosure _ -> e
+       RecClosure (prune_env env body,f,arg,body)
+    | Fun (arg,_,body) ->
+       Closure (prune_env env body,arg,body)
+    | Closure _ | RecClosure _ | TypClosure _ -> e
     | App (e1,e2) ->
         let v1 = eval_loop env e1 in
         let v2 = eval_loop env e2 in
         (match v1 with
-           Closure (env_cl,f,arg,body) ->
+         | RecClosure (env_cl,f,arg,body) ->
              let env_cl' = update_exp env_cl arg v2 in
              let env_cl'' = update_exp env_cl' f v1 in
              eval_loop env_cl'' body
+         | Closure (env_cl,arg,body) ->
+	     let env_cl' = update_exp env_cl arg v2 in
+             eval_loop env_cl' body             
          | _ -> raise (BadApplication e))
     | TypLam (v,e') -> TypClosure (prune_env env e', v, e')
     | TypApp (e',t) ->
