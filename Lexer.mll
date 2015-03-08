@@ -1,6 +1,5 @@
-{ open Lexing
-open Parser
-
+{open Parser
+open Lexing
 exception SyntaxError of string
 
 let next_line lexbuf =
@@ -24,10 +23,10 @@ rule read =
   | "true"   { TRUE }
   | "false"  { FALSE }
   | "let"    { LET }
-  | "let" white "rec" { LETREC }	     
   | "in"     { IN }
   | '='      { ASSIGN }
   | "::"     { CONS }
+  | "nil"    { NIL }
   | '['      { LBRACK }
   | ']'      { RBRACK }	     
   | '('      { LPAREN }
@@ -38,12 +37,10 @@ rule read =
   | "match"  { MATCH }
   | "with"   { WITH }
   | '|'      { VERT_BAR }	     
-
   | "forall" { FORALL }
   | "int"    { INT_TYP }
   | "bool"   { BOOL_TYP }
   | "list"   { LIST_TYP }
-
 
   | '.'      { DOT }
   | "if"     { IF }

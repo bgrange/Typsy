@@ -80,7 +80,7 @@ let rec typeof_ (ctx : context) (tctx : type_context) (e : exp) : typ =
       | _ -> raise (Type_error "Expected a List"))
   | Rec (name,arg,arg_typ,body_typ,body) ->
      let rec_typ = FunTyp(arg_typ,body_typ) in
-     let new_ctx = (name,FunTyp(arg_typ,body_typ))::(arg,arg_typ)::ctx in
+     let new_ctx = (name,rec_typ)::(arg,arg_typ)::ctx in
      let body_typ' = typeof_ new_ctx tctx body in
      expect body_typ body_typ' ; rec_typ
   | Fun (arg,arg_typ,body) ->

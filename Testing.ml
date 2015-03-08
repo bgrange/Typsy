@@ -188,6 +188,19 @@ let to_pair ((n1,n2):int*int) : exp =
 
 let pairs = listify (List.map to_pair [(1,2);(2,3);(3,4)]) ;;
  *)
+
+let map_generic =
+  TypLam ("X", TypLam ("Y",      
+  Rec ("map", "f", FunTyp(VarTyp "X",VarTyp "Y"), FunTyp(ListTyp (VarTyp "X"),ListTyp (VarTyp "Y")),
+    Rec ("mapf", "l", ListTyp (VarTyp "X"), ListTyp (VarTyp "Y"),
+      Match (Var "l",
+                    EmptyList (VarTyp "Y"),
+        "hd", "tl", Cons (App (Var "f", Var "hd"),
+                          App (Var "mapf", Var "tl")))))))
+    
+let incr_all_with_generic = App (TypApp (TypApp (map_generic, IntTyp), IntTyp),
+                   incr) ;;
+
 (*********)
 (* TESTS *)
 (*********)
@@ -195,6 +208,7 @@ let pairs = listify (List.map to_pair [(1,2);(2,3);(3,4)]) ;;
 (* Feel free to add many more tests of your own to the list *)
 let tests = [zero; fact; fact4; list4; sl4; clo; incr_all;
 		App (incr_all,list4); app_times5;
+                App (incr_all_with_generic,list4)
 		(*p; first; second; zip; app_zip; App(sum_pairs, pairs)*)
 		]
 
@@ -211,5 +225,6 @@ let run_test eval exp =
 
 let run_tests eval tests =
   List.iter (run_test eval) tests
+;;
 
-
+run_tests Eval.eval tests
