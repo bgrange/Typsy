@@ -1,3 +1,2 @@
 <**/*>: package(core), package(deriving.syntax), package(deriving), syntax(camlp4o), thread, use_menhir
-<test/*>: package(oUnit)
-<test>: include
+<ounit_tests.*>: package(oUnit), include

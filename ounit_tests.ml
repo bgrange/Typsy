@@ -4,8 +4,6 @@ open SharedSyntax
 open ParseEval
 open Filename
 
-let test_dir = "test"
-
 (* Useful Constants *)
 let zero = Constant (Int 0) 
 let one = Constant (Int 1) 
@@ -20,6 +18,7 @@ let rec listify (l:exp list) : exp =
     | hd::tl -> Cons(hd,listify tl)		    
 
 
+let test_dir = "test"
 let eval_file f = ParseEval.eval_file (concat test_dir f)
 
 let test_map _ = assert_equal (eval_file "map.myml" ())
