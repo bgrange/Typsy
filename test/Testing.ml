@@ -7,7 +7,6 @@
  *)
 
 open TypedSyntax
-open Printing
 
 
 (************)

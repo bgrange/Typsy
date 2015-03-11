@@ -1,3 +1,0 @@
-/\X. (/\X \x:X. x) \f:(X->X). \x:X. f(f(x))
-has type
-forall X, (forall X, X -> X) applied to (X -> X) -> (X -> X)

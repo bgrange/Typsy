@@ -1,6 +1,6 @@
-open TypedSyntax ;;
-open Util ;;
-open Printing ;;
+open TypedSyntax
+open SharedSyntax
+open Type  
   
 (* Finds type of an expression given annotated function
 arguments *)
@@ -18,9 +18,9 @@ let op_type (op:operator) : typ =
 
 let expect (t1:typ) (t2:typ) : unit =
   if t1 <> t2 then
-    raise (Type_error ("expected " ^ (string_of_typ t1) ^ ", got " ^ (string_of_typ t2)))
-	  
-	  
+    raise (Type_error ("expected " ^ (Pretty.string_of_typ t1) ^ ", got " ^
+                                     (Pretty.string_of_typ t2)))
+	  	  
 let rec typeof_ (ctx : context) (tctx : type_context) (e : exp) : typ =
   match e with
   | Var v ->
@@ -44,10 +44,6 @@ let rec typeof_ (ctx : context) (tctx : type_context) (e : exp) : typ =
      let e2_typ = typeof_ ctx tctx e2 in
      expect cond_typ BoolTyp ; expect e1_typ e2_typ ;
      e1_typ
-  | Let (v, e1, e2) ->
-     let e1_typ = typeof_ ctx tctx e1 in
-     let new_ctx = (v,e1_typ) :: ctx in
-     typeof_ new_ctx tctx e2
   | Pair (e1,e2) ->
      let e1_typ = typeof_ ctx tctx e1 in
      let e2_typ = typeof_ ctx tctx e2 in
@@ -62,7 +58,10 @@ let rec typeof_ (ctx : context) (tctx : type_context) (e : exp) : typ =
      (match p_typ with
       | PairTyp (_,t) -> t
       | _ -> raise (Type_error "Expected a Pair"))
-  | EmptyList t -> ListTyp t
+  | EmptyList t ->
+     (match t with
+      | ListTyp _ -> t
+      | _ -> raise (Type_error "Expected a list"))
   | Cons (hd,tl) ->
      let hd_typ = typeof_ ctx tctx hd in
      let tl_typ = typeof_ ctx tctx tl in
@@ -86,8 +85,6 @@ let rec typeof_ (ctx : context) (tctx : type_context) (e : exp) : typ =
   | Fun (arg,arg_typ,body) ->
      let new_ctx = (arg,arg_typ)::ctx in
      FunTyp (arg_typ, typeof_ new_ctx tctx body)
-  | Closure _ | RecClosure _ | TypClosure _ ->
-				raise (Type_error "Can't typecheck closures")
   | App (e1,e2) ->
      (match typeof_ ctx tctx e1 with
       | FunTyp (t_in,t_out) ->
@@ -100,7 +97,7 @@ let rec typeof_ (ctx : context) (tctx : type_context) (e : exp) : typ =
   | TypApp (e,t) ->
      let e_typ = typeof_ ctx tctx e in
      (match e_typ with
-      | Forall (v, body_typ) -> sub_in_typ body_typ v t
+      | Forall (v, body_typ) -> Util.sub_in_typ body_typ v t
       | _ -> raise (Type_error "Expected a universal type"))				       
        
 let typeof (e:exp) = typeof_ [] [] e

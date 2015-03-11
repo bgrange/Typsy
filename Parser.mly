@@ -52,18 +52,21 @@ let rec unpack_tfun args e =
   | arg::args' -> TypLam (arg, unpack_tfun args' e)
 
 
+let get_fun_typ args ret_typ : typ =
+  List.fold_right
+       (fun (_,t) t_acc -> FunTyp (t,t_acc))
+       args
+       ret_typ
+
 let unpack_let f args ret_typ e1 e2 : exp =
-  let f_typ = List.fold_right
-		    (fun (_,t) t_acc -> FunTyp (t,t_acc))
-		    args
-		    ret_typ
-  in
+  let f_typ = get_fun_typ args ret_typ in
   let f_to_body = Fun (f,f_typ,e2) in
   if SS.mem f (free_vars e1) then
     match args with
     | (a1,a1_typ)::args' ->
+       let f_of_a1_typ = get_fun_typ args' ret_typ in
        App(f_to_body,
-	   Rec (f,a1,a1_typ,ret_typ,unpack_fun args' e1))
+	   Rec (f,a1,a1_typ,f_of_a1_typ,unpack_fun args' e1))
     | [] -> raise (Failure "expected function argument")
   else
     App (f_to_body,

@@ -1,6 +1,11 @@
+open Environment     
 open SharedSyntax
 open Type
 
+module TS = TypedSyntax
+module SS = Set.Make(String)   
+type tenv = typ Env.t
+    
 type exp = 
   (* Basic *)
   | Var of variable   
@@ -14,19 +19,22 @@ type exp =
   | Snd of exp
 
   (* Lists *)
-  | EmptyList of typ
+  | EmptyList
   | Cons of exp * exp  
   | Match of exp * exp * variable * variable * exp  
 
   (* Function *)
   | App of exp * exp
-  | Fun of variable * typ * exp		   
-  | Rec of variable * variable * typ * typ * exp
+  | Fun of variable * exp * SS.t * SS.t		   
+  | Rec of variable * variable * exp * SS.t * SS.t
 
   (* Type abstraction/application *)
-  | TypLam of variable * exp
+  | TypLam of variable * exp * SS.t * SS.t
   | TypApp of exp * typ
-              deriving (Show)
 
+  (* Closures *)		       
+  | Closure of env * tenv * variable * exp
+  | RecClosure of env * tenv * variable * variable * exp
+and env = exp Env.t
 
 

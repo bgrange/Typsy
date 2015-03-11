@@ -2,9 +2,10 @@
 (* An environment-based evaluator for Dynamic ML *)
 (*************************************************)
 
-open TypedSyntax
-open Printing
-open Util
+open SharedSyntax
+open EvalSyntax
+open Type  
+open Environment       
        
 exception BadList of exp
 exception UnboundVariable of variable 
@@ -13,7 +14,10 @@ exception BadIf of exp
 exception BadMatch of exp 
 exception BadOp of exp * operator * exp 
 exception BadPair of exp
-		       
+
+
+module SS = Set.Make(String) ;;
+
 (* Defines the subset of expressions considered values
    Notice that closures are values but the rec form is not -- this is
    slightly different from the way values are defined in the 
@@ -36,111 +40,113 @@ let apply_op (v1:exp) (op:operator) (v2:exp) : exp =
        | Constant (Int i), LessEq, Constant (Int j) -> 
          Constant (Bool (i<=j))
        | _, _, _ -> raise (BadOp (v1,op,v2))
-			  
+
 let rec is_value (e:exp) : bool = 
   match e with
       Constant _ -> true  
     | Pair (e1, e2) -> is_value e1 && is_value e2
-    | EmptyList _ -> true
+    | EmptyList -> true
     | Cons (e1, e2) -> is_value e1 && is_value e2
     | Closure _ -> true
-    | TypClosure _ -> true		     
     | _ -> false
+      
+let prune_env (env:'a Env.t) (fvars:SS.t) (e:exp) : 'a Env.t =
+  Env.filter (fun v -> SS.mem v fvars) env
 
-let prune_env (env:env) (e:exp) : env =
-  let normal_frees = free_vars e in
-  let tvar_frees = free_tvars e in
-  (List.filter (fun (v,_) -> SS.mem v normal_frees) (fst env),
-   List.filter (fun (v,_) -> SS.mem v tvar_frees) (snd env))
-	     
 (* evaluation; use eval_loop to recursively evaluate subexpressions *)
-let eval_body (env:env) (eval_loop:env -> exp -> exp) (e:exp) : exp =
+let eval_body (env:exp Env.t) (tenv:typ Env.t)
+	      (eval_loop:exp Env.t -> typ Env.t -> exp -> exp) (e:exp) : exp =
   match e with
     | Var x -> 
-      (match lookup_exp env x with 
+      (match Env.lookup env x with 
   	  None -> raise (UnboundVariable x)
 	| Some v -> v)
     | Constant _ -> e
     | Op (e1,op,e2) ->
-        let v1 = eval_loop env e1 in
-        let v2 = eval_loop env e2 in
+        let v1 = eval_loop env tenv e1 in
+        let v2 = eval_loop env tenv e2 in
         apply_op v1 op v2
     | If (e1,e2,e3) -> 
-        (match eval_loop env e1 with 
-           | Constant (Bool true) -> eval_loop env e2
-           | Constant (Bool false) -> eval_loop env e3
+        (match eval_loop env tenv e1 with 
+           | Constant (Bool true) -> eval_loop env tenv e2
+           | Constant (Bool false) -> eval_loop env tenv e3
            | v1 -> raise (BadIf v1))
-    | Let (x,e1,e2) -> eval_loop (update_exp env x e1) e2
-    | Pair (e1,e2) -> Pair(eval_loop env e1, eval_loop env e2)
+    | Pair (e1,e2) -> Pair(eval_loop env tenv e1, eval_loop env tenv e2)
     | Fst p -> 
-        (match eval_loop env p with
+        (match eval_loop env tenv p with
            Pair(first, _) -> first
          | _ -> raise (BadPair p))
     | Snd p -> 
-        (match eval_loop env p with
+        (match eval_loop env tenv p with
            Pair(_, second) -> second
          | _ -> raise (BadPair p))
-    | EmptyList _ -> e
+    | EmptyList -> e
     | Cons (e1,e2) ->
-        let hd = eval_loop env e1 in
-        let tl = eval_loop env e2 in
+        let hd = eval_loop env tenv e1 in
+        let tl = eval_loop env tenv e2 in
         (match tl with
-           EmptyList _ | Cons _ -> Cons (hd,tl)
+           EmptyList | Cons _ -> Cons (hd,tl)
          | _ -> raise (BadList tl))
     | Match (e1, e2, x_hd, x_tl, e3) ->
-        let v1 = eval_loop env e1 in
+        let v1 = eval_loop env tenv e1 in
         (match v1 with
-           EmptyList _ -> eval_loop env e2
+           EmptyList -> eval_loop env tenv e2
          | Cons (v_hd, v_tl) ->
-             let env' = update_exp env x_hd v_hd in
-             let env'' = update_exp env' x_tl v_tl in
-             eval_loop env'' e3
+             let env' = Env.update env x_hd v_hd in
+             let env'' = Env.update env' x_tl v_tl in
+             eval_loop env'' tenv e3
          | _ -> raise (BadList v1))
-    | Rec (f,arg,_,_,body) ->
-       RecClosure (prune_env env body,f,arg,body)
-    | Fun (arg,_,body) ->
-       Closure (prune_env env body,arg,body)
-    | Closure _ | RecClosure _ | TypClosure _ -> e
+    | Rec (f,arg,body,fvars,ftvars) ->
+       RecClosure (prune_env env fvars body,
+		   prune_env tenv ftvars body,
+		   f,arg,body)
+    | Fun (arg,body,fvars,ftvars) ->
+       Closure (prune_env env fvars body,
+		prune_env tenv ftvars body,
+		arg,body)
+    | Closure _ | RecClosure _  -> e
     | App (e1,e2) ->
-        let v1 = eval_loop env e1 in
-        let v2 = eval_loop env e2 in
+        let v1 = eval_loop env tenv e1 in
+        let v2 = eval_loop env tenv e2 in
         (match v1 with
-         | RecClosure (env_cl,f,arg,body) ->
-             let env_cl' = update_exp env_cl arg v2 in
-             let env_cl'' = update_exp env_cl' f v1 in
-             eval_loop env_cl'' body
-         | Closure (env_cl,arg,body) ->
-	     let env_cl' = update_exp env_cl arg v2 in
-             eval_loop env_cl' body             
+         | RecClosure (env_cl,tenv_cl,f,arg,body) ->
+             let env_cl' = Env.update env_cl arg v2 in
+             let env_cl'' = Env.update env_cl' f v1 in
+             eval_loop env_cl'' tenv body
+         | Closure (env_cl,tenv_cl,arg,body) ->
+	     let env_cl' = Env.update env_cl arg v2 in
+             eval_loop env_cl' tenv body             
          | _ -> raise (BadApplication e))
-    | TypLam (v,e') -> TypClosure (prune_env env e', v, e')
+    | TypLam (v,e',fvars,ftvars) ->
+        Closure (prune_env env fvars e',
+                 prune_env tenv ftvars e', v, e')			       
     | TypApp (e',t) ->
-       let ve' = eval_loop env e' in
+       let ve' = eval_loop env tenv e' in
        (match ve' with
-	| TypClosure (env_cl,arg,body) ->
-	   let env_cl' = update_typ env_cl arg t in
-	   eval_loop env_cl' body
+	| Closure (env_cl,tenv_cl,arg,body) ->
+	   let tenv_cl' = Env.update tenv_cl arg t in
+	   eval_loop env_cl tenv_cl' body
 	| _ -> raise (BadApplication e))
 ;;
 
 (* evaluate closed, top-level expression e *)
 
-let eval e =
-  let rec loop env e = eval_body env loop e in
-  loop empty_env e
+let eval (e:EvalSyntax.exp) =
+  let rec loop env tenv e = eval_body env tenv loop e in
+  loop Env.empty Env.empty e
 
 
 (* print out subexpression after each step of evaluation *)
 let debug_eval e = 
-  let rec loop env e =
+  let rec loop env tenv e =
     if is_value e then e  (* don't print values *)
     else 
       begin
-	Printf.printf "Evaluating %s\n" (string_of_exp e); 
-	let v = eval_body env loop e in 
+	Printf.printf "Evaluating %s\n" (Pretty.string_of_exp e); 
+	let v = eval_body env tenv loop e in 
 	Printf.printf 
-	  "%s evaluated to %s\n" (string_of_exp e) (string_of_exp v); 
+	  "%s evaluated to %s\n" (Pretty.string_of_exp e) (Pretty.string_of_exp v); 
 	v
       end
   in
-  loop empty_env e
+  loop Env.empty Env.empty e
