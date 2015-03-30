@@ -1,9 +1,7 @@
-open Environment     
 open Common
 open Type
 
-module TS = TypedSyntax
-type tenv = typ Env.t
+type tenv = typ SM.t
     
 type exp = 
   (* Basic *)
@@ -30,7 +28,7 @@ type exp =
   (* Function *)
   | App of exp * exp
   | Fun of variable * exp * SS.t * SS.t		   
-  | Rec of variable * variable * exp * SS.t * SS.t
+  | Rec of variable * exp * SS.t * SS.t
 
   (* Type abstraction/application *)
   | TypLam of variable * exp * SS.t * SS.t
@@ -39,6 +37,6 @@ type exp =
   (* Closures *)		       
   | Closure of env * tenv * variable * exp
   | RecClosure of env * tenv * variable * variable * exp
-and env = exp Env.t
+and env = exp SM.t
 
 

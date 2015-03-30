@@ -131,7 +131,7 @@ arg:
                                          | id = ID;                                   { (id,NoTyp) }
 
 tcase_annot:
-        | LBRACK; id = ID; t = typ; RBRACK           { (id,t) }
+        | LBRACK; id = ID; DOT; t = typ; RBRACK           { (id,t) }
 
 exp:
         | LET; is_rec = boption(REC); f = ID; args = list(arg);
@@ -157,17 +157,17 @@ exp:
         | TYPECASE; annot = option(tcase_annot); t = typ; OF; option(VERT_BAR);
           matches = separated_list(VERT_BAR,separated_pair(typ,BIG_ARROW,exp)); END
                                    { match matches with
-                                     | [(BoolTyp,ebool);
-                                        (IntTyp,eint);
+                                     | [(IntTyp,eint);
+                                        (BoolTyp,ebool);
                                         (FunTyp(VarTyp a, VarTyp b),efun);
                                         (PairTyp(VarTyp c, VarTyp d),epair);
                                         (ListTyp(VarTyp f), elist)] -> Typecase (annot,t,
-                                                                                ebool,
                                                                                 eint,
+                                                                                ebool,
                                                                                 a,b,efun,
                                                                                 c,d,epair,
                                                                                 f,elist)
-                                     | _ -> raise Error }
+                                     | _ -> print_endline (Show.show<(typ * exp) list> matches); raise Error }
 
         | e = exp2                            { e }
     

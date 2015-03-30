@@ -1,5 +1,5 @@
 let f : (forall a. a -> int) = tfun a => fun (x:a) =>
-  typecase a of
+  typecase [d . int] a of
   | int => x + 5
   | bool => if x then 3 else 43
   end

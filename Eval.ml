@@ -5,7 +5,6 @@
 open Common
 open EvalSyntax
 open Type  
-open Environment
 open Util
        
 exception BadList of exp
@@ -16,14 +15,7 @@ exception BadMatch of exp
 exception BadOp of exp * operator * exp 
 exception BadPair of exp
 exception BadTypecase of exp
-
-
-(* Defines the subset of expressions considered values
-   Notice that closures are values but the rec form is not -- this is
-   slightly different from the way values are defined in the 
-   substitution-based interpreter.  Rhetorical question:  Why is that?
-   Notice also that Cons(v1,v2) is a value (if v1 and v2 are both values).
- *)
+    
 
 let apply_op (v1:exp) (op:operator) (v2:exp) : exp = 
      match v1, op, v2 with 
@@ -50,13 +42,13 @@ let rec is_value (e:exp) : bool =
     | Closure _ -> true
     | _ -> false
       
-let prune_env (env:'a Env.t) (fvars:SS.t) : 'a Env.t =
-  Env.filter (fun v -> SS.mem v fvars) env
+let prune_env (env:'a SM.t) (fvars:SS.t) : 'a SM.t =
+  SM.filter (fun v _ -> SS.mem v fvars) env
 
 (* substitute for the free variables in t *)
 (* this is virtually identical to Util.sub_in_typ
    maybe something can be factored out *)    
-let eval_typ (tenv:typ Env.t) (t:typ) : typ =
+let eval_typ (tenv:typ SM.t) (t:typ) : typ =
   let rec aux t b =
     match t with
     | BoolTyp | IntTyp -> t
@@ -65,21 +57,20 @@ let eval_typ (tenv:typ Env.t) (t:typ) : typ =
     | ListTyp t1 -> ListTyp (aux t1 b)
     | VarTyp v ->
       if SS.mem v b then t else
-      (match Env.lookup tenv v with
-       | None -> raise (UnboundVariable v)
-       | Some u -> u)
+        (try SM.find v tenv
+         with Not_found -> raise (UnboundVariable v))
     | Forall (v,u) -> Forall (v,aux u b)
   in
   aux t SS.empty
 
 (* evaluation; use eval_loop to recursively evaluate subexpressions *)
-let eval_body (env:exp Env.t) (tenv:typ Env.t)
-	      (eval_loop:exp Env.t -> typ Env.t -> exp -> exp) (e:exp) : exp =
+let eval_body (env:exp SM.t) (tenv:typ SM.t)
+	      (eval_loop:exp SM.t -> typ SM.t -> exp -> exp) (e:exp) : exp =
   match e with
     | Var x -> 
-      (match Env.lookup env x with 
-  	  None -> raise (UnboundVariable x)
-	| Some v -> v)
+      (try SM.find x env
+       with Not_found -> raise (UnboundVariable x))
+
     | Constant _ -> e
     | Op (e1,op,e2) ->
         let v1 = eval_loop env tenv e1 in
@@ -111,8 +102,8 @@ let eval_body (env:exp Env.t) (tenv:typ Env.t)
         (match v1 with
            EmptyList -> eval_loop env tenv e2
          | Cons (v_hd, v_tl) ->
-             let env' = Env.update env x_hd v_hd in
-             let env'' = Env.update env' x_tl v_tl in
+             let env' = SM.add x_hd v_hd env in
+             let env'' = SM.add x_tl v_tl env' in
              eval_loop env'' tenv e3
          | _ -> raise (BadList v1))
     | Rec (f,arg,body,fvars,ftvars) ->
@@ -129,11 +120,11 @@ let eval_body (env:exp Env.t) (tenv:typ Env.t)
         let v2 = eval_loop env tenv e2 in
         (match v1 with
          | RecClosure (env_cl,tenv_cl,f,arg,body) ->
-             let env_cl' = Env.update env_cl arg v2 in
-             let env_cl'' = Env.update env_cl' f v1 in
+             let env_cl' = SM.add arg v2 env_cl in
+             let env_cl'' = SM.add f v1 env_cl' in
              eval_loop env_cl'' tenv_cl body
          | Closure (env_cl,tenv_cl,arg,body) ->
-	     let env_cl' = Env.update env_cl arg v2 in
+	     let env_cl' = SM.add arg v2 env_cl in
              eval_loop env_cl' tenv_cl body             
          | _ -> raise (BadApplication e))
     | TypLam (v,e',fvars,ftvars) ->
@@ -143,7 +134,7 @@ let eval_body (env:exp Env.t) (tenv:typ Env.t)
        let ve' = eval_loop env tenv e' in
        (match ve' with
 	| Closure (env_cl,tenv_cl,arg,body) ->
-           let tenv_cl' = Env.update tenv_cl arg t in
+           let tenv_cl' = SM.add arg t tenv_cl in
 	   eval_loop env_cl tenv_cl' body
         | _ -> raise (BadApplication e))
     | Typecase ((v,t),alpha,
@@ -156,13 +147,13 @@ let eval_body (env:exp Env.t) (tenv:typ Env.t)
        | BoolTyp -> eval_loop env tenv ebool
        | IntTyp -> eval_loop env tenv eint
        | FunTyp (t1,t2) ->
-         let new_tenv = Env.update (Env.update tenv a t1) b t2 in
+         let new_tenv = SM.add b t2 (SM.add a t1 tenv) in
          eval_loop env new_tenv efun
        | PairTyp (t1,t2) ->
-         let new_tenv = Env.update (Env.update tenv c t1) d t2 in
+         let new_tenv = SM.add d t2 (SM.add c t1 tenv) in
          eval_loop env new_tenv epair
        | ListTyp t' ->
-         let new_tenv = Env.update tenv f t' in
+         let new_tenv = SM.add f t' tenv in
          eval_loop env new_tenv elist
        | _ -> raise (BadTypecase e))
 ;;
@@ -171,7 +162,7 @@ let eval_body (env:exp Env.t) (tenv:typ Env.t)
 
 let eval (e:EvalSyntax.exp) =
   let rec loop env tenv e = eval_body env tenv loop e in
-  loop Env.empty Env.empty e
+  loop SM.empty SM.empty e
 
 
 (* print out subexpression after each step of evaluation *)
@@ -187,4 +178,4 @@ let debug_eval e =
 	v
       end
   in
-  loop Env.empty Env.empty e
+  loop SM.empty SM.empty e

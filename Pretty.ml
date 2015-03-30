@@ -61,18 +61,6 @@ let precedence e =
     | TypApp _ -> 2
     | Typecase _ -> max_prec
 
-(*		    
-let rec env2string env =
-  let elem2string x v = x ^ "=" ^ exp2string max_prec v in
-  let rec aux env =
-    match env with
-	[] -> ""
-      | [(x,v)] -> elem2string x v
-      | (x,v)::rest -> elem2string x v ^ ";" ^ aux rest 
-  in
-  "[" ^ aux env ^ "]"
- *)
-
 		    
 let rec exp2string prec e = 
   let p = precedence e in 

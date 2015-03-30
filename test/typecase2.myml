@@ -1,4 +1,8 @@
-typecase int of
-| int => 5
-| bool => 10
+let rec test
+typecase [d.int] int*int  of
+| int => 10
+| bool => 5
+| a -> b => 33
+| a * b => 35
+| list a => 3400
 end

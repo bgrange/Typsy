@@ -26,7 +26,7 @@ type exp =
   (* Function *)
   | App of exp * exp
   | Fun of variable * typ * exp		   
-  | Rec of variable * variable * typ * typ * exp
+  | Rec of variable * typ * exp
 
   (* Type abstraction/application *)
   | TypLam of variable * exp
