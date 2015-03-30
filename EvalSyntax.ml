@@ -1,9 +1,8 @@
 open Environment     
-open SharedSyntax
+open Common
 open Type
 
 module TS = TypedSyntax
-module SS = Set.Make(String)   
 type tenv = typ Env.t
     
 type exp = 
@@ -22,6 +21,11 @@ type exp =
   | EmptyList
   | Cons of exp * exp  
   | Match of exp * exp * variable * variable * exp  
+  | Typecase of (variable*typ) * typ *
+                exp * exp *
+                variable * variable * exp *
+                variable * variable * exp *
+                variable * exp
 
   (* Function *)
   | App of exp * exp

@@ -1,5 +1,5 @@
 open Core.Std
-include SharedSyntax
+include Common
 	  
 
 (* Rather than using a typ option, I add a NoTyp constructor so that
@@ -32,7 +32,14 @@ type exp =
   (* Lists *)
   | EmptyList of typ
   | Cons of exp * exp  
-  | Match of exp * exp * variable * variable * exp  
+  | Match of exp * exp * variable * variable * exp
+
+  (* typecase of [d.d -> string] (list a) of ... *)
+  | Typecase of ((variable*typ) option) * typ *
+                exp * exp *
+                variable * variable * exp *
+                variable * variable * exp *
+                variable * exp
 
   (* Function *)
   | App of exp * exp

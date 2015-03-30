@@ -11,19 +11,7 @@ type constant = Int of int | Bool of bool
 type operator = Plus | Minus | Times | Div | Less | LessEq 
   deriving (Show)
 
-let string_of_const c = 
-  match c with 
-    | Int i -> string_of_int i
-    | Bool b -> string_of_bool b
-
-
-let string_of_op op = 
-  match op with 
-    | Plus -> "+" 
-    | Minus -> "-" 
-    | Times -> "*" 
-    | Div -> "/" 
-    | Less -> "<" 
-    | LessEq -> "<=" 
+module SS = Set.Make(String)
+module SM = Map.Make(String)
 
 						      

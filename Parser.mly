@@ -1,46 +1,10 @@
 %{
+open Common
+open Lexing
 open ParsedSyntax
-module SS = Set.Make(String)
 
-let free_vars (e:exp) : SS.t =
-  let rec aux e bound =
-    match e with
-      Var x ->
-        if SS.mem x bound then SS.empty else SS.singleton x
-    | Constant _ -> SS.empty
-    | Op (e1,op,e2) ->
-        SS.union (aux e1 bound)
-                 (aux e2 bound)
-    | If (e1,e2,e3) ->
-        SS.union (SS.union (aux e1 bound)
-                           (aux e2 bound))
-                           (aux e3 bound)
-    | Fun (x,_,e') ->
-        aux e' (SS.add x bound)
-    | Pair (e1,e2) ->
-        SS.union (aux e1 bound)
-                 (aux e2 bound)
-    | Fst p -> aux p bound
-    | Snd p -> aux p bound
-    | EmptyList _ -> SS.empty 
-    | Cons (hd,tl) -> 
-        SS.union (aux hd bound)
-                 (aux tl bound)
-    | Match (e1,e2,x_hd,x_tl,e3) ->
-        SS.union (SS.union (aux e1 bound)
-                           (aux e2 bound))
-                 (aux e3 (SS.add x_hd
-				 (SS.add x_tl bound)))
-    | Rec (name,arg,_,_,body) ->
-       aux body (SS.add name (SS.add arg bound))
-    | App (e1,e2) ->  
-        SS.union (aux e1 bound)
-                 (aux e2 bound)
-    | TypLam (_,e') -> aux e' bound
-    | TypApp (e',_) -> aux e' bound			   
-  in aux e SS.empty
-;;
-  
+exception Error
+
 let rec unpack_fun ids_and_types e : exp =
   match ids_and_types with
   | [] -> e
@@ -58,20 +22,20 @@ let get_fun_typ args ret_typ : typ =
        args
        ret_typ
 
+let unpack_let_rec f args ret_typ e1 e2 : exp =
+  let f_typ = get_fun_typ args ret_typ in
+  let f_to_body = Fun (f,f_typ,e2) in
+  match args with
+  | (a1,a1_typ)::args' ->
+    let f_of_a1_typ = get_fun_typ args' ret_typ in
+    App(f_to_body,
+	Rec (f,a1,a1_typ,f_of_a1_typ,unpack_fun args' e1))
+  | [] -> raise (Failure "expected function argument")
+
 let unpack_let f args ret_typ e1 e2 : exp =
   let f_typ = get_fun_typ args ret_typ in
   let f_to_body = Fun (f,f_typ,e2) in
-  if SS.mem f (free_vars e1) then
-    match args with
-    | (a1,a1_typ)::args' ->
-       let f_of_a1_typ = get_fun_typ args' ret_typ in
-       App(f_to_body,
-	   Rec (f,a1,a1_typ,f_of_a1_typ,unpack_fun args' e1))
-    | [] -> raise (Failure "expected function argument")
-  else
-    App (f_to_body,
-	 unpack_fun args e1)
-
+  App (f_to_body, unpack_fun args e1)
 
 let to_typ (t_opt:typ option) : typ =
   match t_opt with
@@ -79,12 +43,14 @@ let to_typ (t_opt:typ option) : typ =
   | Some t -> t
 ;;
 
+
 %}
 
 %token <int> INT	       
 %token TRUE
 %token FALSE
 %token LET
+%token REC  
 %token IN
 %token ASSIGN
 %token CONS
@@ -98,6 +64,7 @@ let to_typ (t_opt:typ option) : typ =
 %token MATCH
 %token WITH
 %token VERT_BAR
+%token END
 %token FORALL
 %token DOT
 %token IF
@@ -107,6 +74,7 @@ let to_typ (t_opt:typ option) : typ =
 %token MINUS
 %token DIV
 %token ARROW
+%token BIG_ARROW
 %token PRODUCT
 %left PLUS MINUS
 %left DIV
@@ -116,6 +84,8 @@ let to_typ (t_opt:typ option) : typ =
 %nonassoc LESS LESSEQ
 %token FUN
 %token TFUN
+%token TYPECASE
+%token OF
 %token <string> ID
 %token COMMA
 %right COMMA
@@ -158,20 +128,20 @@ colon_then_typ:
 
 arg:
         | LPAREN; id = ID; COLON; t = typ; RPAREN    { (id,t) }
-        | id = ID;                                   { (id,NoTyp) }   
-        ;
-/*
-type_arg:
-        | LPAREN; a = type_arg; RPAREN               { a }
-        | id = ID                               { id }
-        ;
-*/
+                                         | id = ID;                                   { (id,NoTyp) }
+
+tcase_annot:
+        | LBRACK; id = ID; t = typ; RBRACK           { (id,t) }
+
 exp:
-        | LET; f = ID; args = list(arg); ret_typ = option(colon_then_typ); ASSIGN; e1 = exp; IN; e2 = exp
-                                        { unpack_let f args (to_typ ret_typ) e1 e2 }
-        | FUN; args = nonempty_list(arg); ARROW; body = exp;
+        | LET; is_rec = boption(REC); f = ID; args = list(arg);
+          ret_typ = option(colon_then_typ); ASSIGN; e1 = exp; IN; e2 = exp
+                                                                    { if is_rec
+                                                                      then unpack_let_rec f args (to_typ ret_typ) e1 e2
+                                                                      else unpack_let f args (to_typ ret_typ) e1 e2 }
+        | FUN; args = nonempty_list(arg); BIG_ARROW; body = exp;
                                         { unpack_fun args body }
-        | TFUN; args = nonempty_list(ID); ARROW; body = exp;
+        | TFUN; args = nonempty_list(ID); BIG_ARROW; body = exp;
                                         { unpack_tfun args body }
         | IF; cond = exp;
                 THEN; then_exp = exp;
@@ -179,13 +149,29 @@ exp:
                                         { If (cond, then_exp, else_exp) }
         | MATCH; e1 = exp; WITH;
           VERT_BAR; NIL;
-          ARROW; e2 = exp; VERT_BAR;
+          BIG_ARROW; e2 = exp; VERT_BAR;
           hd = ID; CONS; tl = ID;
-          ARROW; e3 = exp;              { Match (e1,e2,hd,tl,e3) }
+          BIG_ARROW; e3 = exp; END              { Match (e1,e2,hd,tl,e3) }
         | NIL; t = option(colon_then_typ);                          
                                         { EmptyList (to_typ t) }
+        | TYPECASE; annot = option(tcase_annot); t = typ; OF; option(VERT_BAR);
+          matches = separated_list(VERT_BAR,separated_pair(typ,BIG_ARROW,exp)); END
+                                   { match matches with
+                                     | [(BoolTyp,ebool);
+                                        (IntTyp,eint);
+                                        (FunTyp(VarTyp a, VarTyp b),efun);
+                                        (PairTyp(VarTyp c, VarTyp d),epair);
+                                        (ListTyp(VarTyp f), elist)] -> Typecase (annot,t,
+                                                                                ebool,
+                                                                                eint,
+                                                                                a,b,efun,
+                                                                                c,d,epair,
+                                                                                f,elist)
+                                     | _ -> raise Error }
+
         | e = exp2                            { e }
-        
+    
+            
 exp2:
         | e1 = exp2; PLUS ; e2 = exp2     { Op (e1, Plus, e2) }
         | e1 = exp2; MINUS ; e2 = exp2    { Op (e1, Minus, e2) }

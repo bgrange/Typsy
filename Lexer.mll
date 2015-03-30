@@ -23,7 +23,11 @@ rule read =
   | "true"   { TRUE }
   | "false"  { FALSE }
   | "let"    { LET }
+  | "rec"    { REC }
   | "in"     { IN }
+  | "typecase" { TYPECASE }
+  | "of"     { OF }
+  | "end"    { END }     
   | '='      { ASSIGN }
   | "::"     { CONS }
   | "nil"    { NIL }
@@ -34,6 +38,7 @@ rule read =
   | ':'      { COLON }
   | '*'      { PRODUCT }	     
   | "->"     { ARROW }
+  | "=>"     { BIG_ARROW }
   | "match"  { MATCH }
   | "with"   { WITH }
   | '|'      { VERT_BAR }	     

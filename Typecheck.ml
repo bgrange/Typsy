@@ -1,14 +1,12 @@
 open TypedSyntax
-open SharedSyntax
-open Type  
+open Common
+open Type
+open Environment
   
 (* Finds type of an expression given annotated function
 arguments *)
-  
-exception Type_error of string ;;
-  
-type context = (variable * typ) list
-type type_context = variable list				
+
+exception Type_error of string ;;				
 				
 let op_type (op:operator) : typ =
   match op with
@@ -18,14 +16,22 @@ let op_type (op:operator) : typ =
 
 let expect (t1:typ) (t2:typ) : unit =
   if t1 <> t2 then
-    raise (Type_error ("expected " ^ (Pretty.string_of_typ t1) ^ ", got " ^
-                                     (Pretty.string_of_typ t2)))
-	  	  
-let rec typeof_ (ctx : context) (tctx : type_context) (e : exp) : typ =
+    raise (Type_error ("expected " ^ (Pretty.string_of_typ t1) ^
+                       ", got " ^    (Pretty.string_of_typ t2)))
+
+let rec is_polytype (t:typ) : bool =
+  match t with
+  | BoolTyp | IntTyp | VarTyp _ -> false
+  | FunTyp (t1,t2) | PairTyp (t1,t2) -> is_polytype t1 || is_polytype t2
+  | ListTyp u -> is_polytype u
+  | Forall _ -> true
+
+let rec typeof_ (ctx : typ Env.t) (tctx : unit Env.t) (e : exp) : typ =
   match e with
   | Var v ->
-     (try List.assoc v ctx
-      with Not_found -> raise (Type_error ("unbound variable " ^ v)))
+    (match Env.lookup ctx v with
+     | None -> raise (Type_error ("unbound variable" ^ v))
+     | Some t -> t)
   | Constant c ->
       (match c with
        | Int n -> IntTyp
@@ -92,13 +98,47 @@ let rec typeof_ (ctx : context) (tctx : type_context) (e : exp) : typ =
 	 expect t2 t_in ; t_out
       | _ -> raise (Type_error "Expected a function"))
   | TypLam (v,e) ->
-     let e_typ = typeof_ ctx (v::tctx) e in
+     let e_typ = typeof_ ctx (Env.update tctx v ()) e in
      Forall (v, e_typ)
   | TypApp (e,t) ->
+    if is_polytype t
+    then raise (Type_error "can't instantiate a type-function with a polytype")
+    else
      let e_typ = typeof_ ctx tctx e in
      (match e_typ with
       | Forall (v, body_typ) -> Util.sub_in_typ body_typ v t
-      | _ -> raise (Type_error "Expected a universal type"))				       
+      | _ -> raise (Type_error "Expected a universal type"))
+
+  | Typecase ((v,t),alpha,
+              eint,ebool,
+              a,b,efun,
+              c,d,epair,
+              u,elist) ->
+
+    let tbool = Util.sub_in_typ t v BoolTyp in
+    let ebool_typ = typeof_ ctx tctx ebool in
+    expect tbool ebool_typ ;
+
+    let tint = Util.sub_in_typ t v IntTyp in
+    let eint_typ = typeof_ ctx tctx eint in
+    expect tint eint_typ ;
+
+    let tfun = Util.sub_in_typ t v (FunTyp(VarTyp a,VarTyp b)) in
+    let tctx' = Env.update (Env.update tctx a ()) b () in
+    let efun_typ = typeof_ ctx tctx' efun in
+    expect tfun efun_typ ;
+
+    let tpair = Util.sub_in_typ t v (PairTyp(VarTyp c,VarTyp d)) in
+    let tctx' = Env.update (Env.update tctx c ()) d () in
+    let epair_typ = typeof_ ctx tctx' epair in
+    expect tpair epair_typ ;
+
+    let tlist = Util.sub_in_typ t v (ListTyp (VarTyp u)) in
+    let tctx' = Env.update tctx u () in
+    let elist_typ = typeof_ ctx tctx' elist in
+    expect tlist elist_typ ;
+
+    Util.sub_in_typ t v alpha
        
 let typeof (e:exp) = typeof_ [] [] e
 			     

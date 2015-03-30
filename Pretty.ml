@@ -1,6 +1,21 @@
 open EvalSyntax
-open SharedSyntax
+open Common
 open Type
+
+let string_of_const c = 
+  match c with 
+    | Int i -> string_of_int i
+    | Bool b -> string_of_bool b
+
+
+let string_of_op op = 
+  match op with 
+    | Plus -> "+" 
+    | Minus -> "-" 
+    | Times -> "*" 
+    | Div -> "/" 
+    | Less -> "<" 
+    | LessEq -> "<=" 
 
 let rec string_of_typ typ =
   match typ with
@@ -44,6 +59,7 @@ let precedence e =
 
     | TypLam _ -> max_prec
     | TypApp _ -> 2
+    | Typecase _ -> max_prec
 
 (*		    
 let rec env2string env =
@@ -84,12 +100,29 @@ let rec exp2string prec e =
 
       | Rec (f,x,body,_,_) -> Printf.sprintf "rec %s %s -> %s" f x (exp2string max_prec body)
       | Fun (x,body,_,_) -> Printf.sprintf "fun %s -> %s" x
-	                          (exp2string max_prec body)		     		  
+	                      (exp2string max_prec body)		     		  
       | App (e1,e2) -> Printf.sprintf "%s %s" (exp2string p e1) (exp2string p e2)
-      | TypLam (v,body,_,_) -> Printf.sprintf "tfun %s -> %s" v (exp2string p body)			       | TypApp (e',t) -> Printf.sprintf "%s [%s]" (exp2string p e') (string_of_typ t)
-      | Closure _ | RecClosure _ -> "<closure>"		      
+      | TypLam (v,body,_,_) -> Printf.sprintf "tfun %s -> %s" v (exp2string p body)			         | TypApp (e',t) -> Printf.sprintf "%s [%s]" (exp2string p e') (string_of_typ t)
+      | Closure _ | RecClosure _ -> "<closure>"
+      | Typecase ((v,t),alpha,
+                  eint,ebool,
+                  a,b,efun,
+                  c,d,epair,
+                  e,elist) ->
+	Printf.sprintf "typecase [%s. %s] %s of\n\
+                        | %s => %s\n\
+                        | %s => %s\n\
+                        | %s => %s\n\
+                        | %s => %s\n\
+                        | %s => %s"
+          v (string_of_typ t) (string_of_typ alpha)
+          (string_of_typ IntTyp) (exp2string p eint)
+          (string_of_typ BoolTyp) (exp2string p ebool)
+          (string_of_typ (FunTyp (VarTyp a,VarTyp b))) (exp2string p efun)
+          (string_of_typ (PairTyp (VarTyp c,VarTyp d))) (exp2string p epair)
+          (string_of_typ (ListTyp (VarTyp e))) (exp2string p elist)
   in 
-    if p > prec then "(" ^ s ^ ")" else s
+  if p > prec then "(" ^ s ^ ")" else s
 
 let string_of_exp e = exp2string max_prec e 
 (*let string_of_env env = env2string env*)

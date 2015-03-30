@@ -2,10 +2,11 @@
 (* An environment-based evaluator for Dynamic ML *)
 (*************************************************)
 
-open SharedSyntax
+open Common
 open EvalSyntax
 open Type  
-open Environment       
+open Environment
+open Util
        
 exception BadList of exp
 exception UnboundVariable of variable 
@@ -14,9 +15,8 @@ exception BadIf of exp
 exception BadMatch of exp 
 exception BadOp of exp * operator * exp 
 exception BadPair of exp
+exception BadTypecase of exp
 
-
-module SS = Set.Make(String) ;;
 
 (* Defines the subset of expressions considered values
    Notice that closures are values but the rec form is not -- this is
@@ -50,8 +50,27 @@ let rec is_value (e:exp) : bool =
     | Closure _ -> true
     | _ -> false
       
-let prune_env (env:'a Env.t) (fvars:SS.t) (e:exp) : 'a Env.t =
+let prune_env (env:'a Env.t) (fvars:SS.t) : 'a Env.t =
   Env.filter (fun v -> SS.mem v fvars) env
+
+(* substitute for the free variables in t *)
+(* this is virtually identical to Util.sub_in_typ
+   maybe something can be factored out *)    
+let eval_typ (tenv:typ Env.t) (t:typ) : typ =
+  let rec aux t b =
+    match t with
+    | BoolTyp | IntTyp -> t
+    | FunTyp (t1,t2) -> FunTyp (aux t1 b, aux t2 b)
+    | PairTyp (t1,t2) -> PairTyp (aux t1 b, aux t2 b)
+    | ListTyp t1 -> ListTyp (aux t1 b)
+    | VarTyp v ->
+      if SS.mem v b then t else
+      (match Env.lookup tenv v with
+       | None -> raise (UnboundVariable v)
+       | Some u -> u)
+    | Forall (v,u) -> Forall (v,aux u b)
+  in
+  aux t SS.empty
 
 (* evaluation; use eval_loop to recursively evaluate subexpressions *)
 let eval_body (env:exp Env.t) (tenv:typ Env.t)
@@ -97,13 +116,13 @@ let eval_body (env:exp Env.t) (tenv:typ Env.t)
              eval_loop env'' tenv e3
          | _ -> raise (BadList v1))
     | Rec (f,arg,body,fvars,ftvars) ->
-       RecClosure (prune_env env fvars body,
-		   prune_env tenv ftvars body,
-		   f,arg,body)
+       RecClosure (prune_env env fvars,
+		   prune_env tenv ftvars,
+		   f,arg,body) 
     | Fun (arg,body,fvars,ftvars) ->
-       Closure (prune_env env fvars body,
-		prune_env tenv ftvars body,
-		arg,body)
+       Closure (prune_env env fvars,
+		prune_env tenv ftvars,
+	 arg,body)
     | Closure _ | RecClosure _  -> e
     | App (e1,e2) ->
         let v1 = eval_loop env tenv e1 in
@@ -112,21 +131,40 @@ let eval_body (env:exp Env.t) (tenv:typ Env.t)
          | RecClosure (env_cl,tenv_cl,f,arg,body) ->
              let env_cl' = Env.update env_cl arg v2 in
              let env_cl'' = Env.update env_cl' f v1 in
-             eval_loop env_cl'' tenv body
+             eval_loop env_cl'' tenv_cl body
          | Closure (env_cl,tenv_cl,arg,body) ->
 	     let env_cl' = Env.update env_cl arg v2 in
-             eval_loop env_cl' tenv body             
+             eval_loop env_cl' tenv_cl body             
          | _ -> raise (BadApplication e))
     | TypLam (v,e',fvars,ftvars) ->
-        Closure (prune_env env fvars e',
-                 prune_env tenv ftvars e', v, e')			       
+        Closure (prune_env env fvars,
+                 prune_env tenv ftvars, v, e')
     | TypApp (e',t) ->
        let ve' = eval_loop env tenv e' in
        (match ve' with
 	| Closure (env_cl,tenv_cl,arg,body) ->
-	   let tenv_cl' = Env.update tenv_cl arg t in
+           let tenv_cl' = Env.update tenv_cl arg t in
 	   eval_loop env_cl tenv_cl' body
-	| _ -> raise (BadApplication e))
+        | _ -> raise (BadApplication e))
+    | Typecase ((v,t),alpha,
+                eint,ebool,
+                a,b,efun,
+                c,d,epair,
+                f,elist) ->
+      let closed_alpha = eval_typ tenv alpha in
+      (match closed_alpha with
+       | BoolTyp -> eval_loop env tenv ebool
+       | IntTyp -> eval_loop env tenv eint
+       | FunTyp (t1,t2) ->
+         let new_tenv = Env.update (Env.update tenv a t1) b t2 in
+         eval_loop env new_tenv efun
+       | PairTyp (t1,t2) ->
+         let new_tenv = Env.update (Env.update tenv c t1) d t2 in
+         eval_loop env new_tenv epair
+       | ListTyp t' ->
+         let new_tenv = Env.update tenv f t' in
+         eval_loop env new_tenv elist
+       | _ -> raise (BadTypecase e))
 ;;
 
 (* evaluate closed, top-level expression e *)

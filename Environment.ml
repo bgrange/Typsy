@@ -1,4 +1,4 @@
-open SharedSyntax
+open Common
 
 module type ENV =
   sig
@@ -7,10 +7,12 @@ module type ENV =
     val filter : (variable -> bool) -> 'a t -> 'a t		   
     val lookup : 'a t -> variable -> 'a option
     val update : 'a t -> variable -> 'a -> 'a t
+    val from_list: (variable * 'a) list -> 'a t
+    val to_list: 'a t -> (variable * 'a) list
   end
 ;;
 
-module ListEnv : ENV =
+module ListEnv (* : ENV *) =
   struct
     type 'a t = (variable * 'a) list
 		     
@@ -26,9 +28,11 @@ module ListEnv : ENV =
 
     let update (ev:'a t) (v:variable) (e:'a) : 'a t =
       (v,e)::ev
+    let from_list l = l
+    let to_list env = env
   end
 ;;    
 
 	
 
-module Env = ListEnv
+module Env = SM

@@ -1,9 +1,11 @@
-open SharedSyntax
+open Common
 module T = Type
 module TS = TypedSyntax  
 open ParsedSyntax
 
-exception Type_error of string ;;
+exception Inference_error ;;
+
+
 
 let rec convert_typ (t:typ) : T.typ =
   match t with
@@ -16,11 +18,11 @@ let rec convert_typ (t:typ) : T.typ =
   | ListTyp t' -> T.ListTyp (convert_typ t')
   | Forall (v,t') -> T.Forall (v,(convert_typ t'))
   | VarTyp x -> T.VarTyp x
-  | NoTyp -> raise (Type_error "can't infer type")
+  | NoTyp -> raise Inference_error
        
 (* For now, don't do any actual type inference, just convert
 ParsedSyntax to TypedSyntax assuming all type annotations are
-present *)
+   present *)
 let rec infer (e:exp) : TS.exp =
   match e with
   | Var v -> TS.Var v   
@@ -40,5 +42,19 @@ let rec infer (e:exp) : TS.exp =
 				   convert_typ t2, infer e')
   | TypLam (v,e') -> TS.TypLam (v,infer e')
   | TypApp (e',t) -> TS.TypApp (infer e', convert_typ t)
+  | Typecase (annot,t,
+              eint,ebool,
+              a,b,efun,
+              c,d,epair,
+              e,elist) ->
+    (match annot with
+     | Some (v,u) ->
+       TS.Typecase ((v,convert_typ u),convert_typ t,
+                    infer eint, infer ebool,
+                    a,b,infer efun,
+                    c,d,infer epair,
+                    e,infer elist)
+     | None -> raise Inference_error)
+
 
 	   

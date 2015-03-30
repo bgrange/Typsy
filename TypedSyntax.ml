@@ -1,4 +1,4 @@
-open SharedSyntax
+open Common
 open Type
 
 type exp = 
@@ -17,6 +17,11 @@ type exp =
   | EmptyList of typ
   | Cons of exp * exp  
   | Match of exp * exp * variable * variable * exp  
+  | Typecase of (variable*typ) * typ *
+                exp * exp *
+                variable * variable * exp *
+                variable * variable * exp *
+                variable * exp
 
   (* Function *)
   | App of exp * exp

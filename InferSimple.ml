@@ -1,7 +1,5 @@
+open Common
 open TypedSyntax ;;
-  
-module SS = Set.Make(String) ;;
-module SM = Map.Make(String) ;;
   
 exception Type_error of string ;;
   

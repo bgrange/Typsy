@@ -1,4 +1,4 @@
-open SharedSyntax
+open Common
 
 type typ =       BoolTyp
 	       | IntTyp

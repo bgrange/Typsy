@@ -1,6 +1,6 @@
 open OUnit2
 open EvalSyntax
-open SharedSyntax  
+open Common  
 open ParseEval
 open Filename
 

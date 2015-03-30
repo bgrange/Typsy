@@ -1,0 +1,4 @@
+typecase int of
+| int => 5
+| bool => 10
+end
