@@ -6,21 +6,28 @@ let string_of_const c =
   match c with 
     | Int i -> string_of_int i
     | Bool b -> string_of_bool b
+    | Str s -> s
 
 
 let string_of_op op = 
   match op with 
     | Plus -> "+" 
     | Minus -> "-" 
-    | Times -> "*" 
+    | Times -> "*"
+    | Mod -> "%"
     | Div -> "/" 
     | Less -> "<" 
-    | LessEq -> "<=" 
+    | LessEq -> "<="
+    | Eq -> "=="
+    | And -> "&&"
+    | Or -> "||"
+    | Concat -> "++"
 
 let rec string_of_typ typ =
   match typ with
   | BoolTyp -> "bool"
   | IntTyp -> "int"
+  | StrTyp -> "str"
   | FunTyp (a,b) -> Printf.sprintf "(%s -> %s)" (string_of_typ a) (string_of_typ b)
   | PairTyp (a,b) -> Printf.sprintf "(%s * %s)" (string_of_typ a) (string_of_typ b)
   | ListTyp a -> Printf.sprintf "list %s" (string_of_typ a)
@@ -38,27 +45,33 @@ let precedence e =
     | Op (_,Plus,_) -> 5
     | Op (_,Minus,_) -> 5
     | Op (_,Times,_) -> 3
+    | Op (_,Mod,_) -> 2
     | Op (_,Div,_) -> 3
     | Op (_,Less,_) -> 7
     | Op (_,LessEq,_) -> 7
+    | Op (_,Eq,_) -> 7
+    | Op (_,And,_) -> 3
+    | Op (_,Or,_) -> 5
+    | Op (_,Concat,_) -> 7
     | If _ -> max_prec
 
     | Pair _ -> 0
-    | Fst _ -> 2
-    | Snd _ -> 2
+    | Fst _ -> 1
+    | Snd _ -> 1
 
     | EmptyList -> 0
     | Cons _ -> 8
     | Match _ -> max_prec
 
     | Rec _ -> max_prec
+    | TypRec _ -> max_prec
     | Fun _ -> max_prec		 
     | Closure _ -> max_prec
     | RecClosure _ -> max_prec		     
-    | App _ ->  2
+    | App _ ->  1
 
     | TypLam _ -> max_prec
-    | TypApp _ -> 2
+    | TypApp _ -> 1
     | Typecase _ -> max_prec
 
 		    
@@ -90,10 +103,12 @@ let rec exp2string prec e =
       | Fun (x,body,_,_) -> Printf.sprintf "fun %s -> %s" x
 	                      (exp2string max_prec body)		     		  
       | App (e1,e2) -> Printf.sprintf "%s %s" (exp2string p e1) (exp2string p e2)
-      | TypLam (v,body,_,_) -> Printf.sprintf "tfun %s -> %s" v (exp2string p body)			         | TypApp (e',t) -> Printf.sprintf "%s [%s]" (exp2string p e') (string_of_typ t)
+      | TypLam (v,body,_,_) -> Printf.sprintf "tfun %s -> %s" v (exp2string p body)
+      | TypRec (f,x,body,_,_) -> Printf.sprintf "trec %s %s -> %s" f x (exp2string max_prec body)
+      | TypApp (e',t) -> Printf.sprintf "%s [%s]" (exp2string p e') (string_of_typ t)
       | Closure _ | RecClosure _ -> "<closure>"
       | Typecase ((v,t),alpha,
-                  eint,ebool,
+                  eint,ebool,estr,
                   a,b,efun,
                   c,d,epair,
                   e,elist) ->

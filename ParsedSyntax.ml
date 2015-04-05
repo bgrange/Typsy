@@ -4,17 +4,18 @@ include Common
 
 (* Rather than using a typ option, I add a NoTyp constructor so that
  * the missing type information can be nested, e.g. IntTyp * (NoTyp -> BoolTyp)
- *)
+*)
 type typ =       BoolTyp
-	       | IntTyp
-	       | FunTyp of typ * typ
-	       | PairTyp of typ * typ				
-	       | ListTyp of typ
-	       | Forall of variable * typ
-	       | VarTyp of variable
-               | NoTyp
-           deriving (Show)
-           
+	 | IntTyp
+         | StrTyp
+	 | FunTyp of typ * typ
+	 | PairTyp of typ * typ				
+	 | ListTyp of typ
+	 | Forall of variable * typ
+	 | VarTyp of variable
+         | NoTyp
+             deriving (Show)
+
 						      
 type exp = 
 
@@ -36,7 +37,7 @@ type exp =
 
   (* typecase of [d.d -> string] (list a) of ... *)
   | Typecase of ((variable*typ) option) * typ *
-                exp * exp *
+                exp * exp * exp *
                 variable * variable * exp *
                 variable * variable * exp *
                 variable * exp
@@ -48,5 +49,6 @@ type exp =
 
   (* Type abstraction/application *)
   | TypLam of variable * exp
+  | TypRec of variable * variable * typ * exp
   | TypApp of exp * typ
               deriving (Show)

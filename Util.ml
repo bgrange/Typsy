@@ -16,7 +16,7 @@ let rec gen_var (avoid:SS.t) () : variable =
 
 let rec _free_tvars_in_typ t bound =
   match t with
-  | BoolTyp | IntTyp -> SS.empty
+  | BoolTyp | IntTyp | StrTyp -> SS.empty
   | FunTyp (t1,t2) | PairTyp (t1,t2) ->
 		      SS.union (_free_tvars_in_typ t1 bound)
 			       (_free_tvars_in_typ t2 bound)
@@ -51,8 +51,9 @@ let free_tvars (e:exp) : SS.t =
     | EmptyList t -> _free_tvars_in_typ t bound
     | TypApp (e',t) -> SS.union (aux e' bound) (_free_tvars_in_typ t bound)
     | TypLam (v,e) -> aux e (SS.add v bound)
+    | TypRec (_,_,t,e') -> SS.union (_free_tvars_in_typ t bound) (aux e' bound)
     | Typecase ((v,t),alpha,
-                eint,ebool,
+                eint,ebool,estr,
                 a,b,efun,
                 c,d,epair,
                 e,elist) ->
@@ -74,7 +75,7 @@ let rec sub_in_typ (t:typ) (v:variable) (u:typ) : typ =
   let fvars = free_tvars_in_typ u in
   let rec aux t =
     match t with
-    | BoolTyp | IntTyp -> t
+    | BoolTyp | IntTyp | StrTyp -> t
     | FunTyp (t1,t2) -> FunTyp (aux t1, aux t2)
     | PairTyp (t1,t2) -> PairTyp (aux t1, aux t2)
     | ListTyp t1 -> ListTyp (aux t1)
@@ -126,8 +127,9 @@ let free_vars (e:exp) : SS.t =
                  (aux e2 bound)
     | TypLam (_,e') -> aux e' bound
     | TypApp (e',_) -> aux e' bound
+    | TypRec (f,v,t,e') -> aux e' bound
     | Typecase ((v,t),alpha,
-                eint,ebool,
+                eint,ebool,estr,
                 a,b,efun,
                 c,d,epair,
                 e,elist) ->
@@ -168,25 +170,28 @@ let rec erase_types (te:exp) : ES.exp =
   | EmptyList _ -> ES.EmptyList
   | Cons (e1,e2) -> ES.Cons ((erase_types e1), (erase_types e2))                         
   | Match (e1,e2,v1,v2,e3) -> ES.Match ((erase_types e1), (erase_types e2),
-                                           v1,v2, (erase_types e3))
+                                        v1,v2, (erase_types e3))
   | App (e1,e2) -> ES.App (erase_types e1,erase_types e2)
   | Fun (v,_,e) -> ES.Fun (v,erase_types e,
-                              free_vars e,
-                              free_tvars e)
+                           free_vars e,
+                           free_tvars e)
   | Rec (v1,v2,_,_,e) -> ES.Rec (v1,v2,erase_types e,
-                                    free_vars e,
-                                    free_tvars e)
+                                 free_vars e,
+                                 free_tvars e)
+  | TypRec (v1,v2,_,e) -> ES.TypRec (v1,v2,erase_types e,
+                                      free_vars e,
+                                      free_tvars e)
   | TypLam (v,e) -> ES.TypLam (v, erase_types e,
                                free_vars e,
                                free_tvars e)
   | TypApp (e,t) -> ES.TypApp (erase_types e, t)
   | Typecase ((v,t),alpha,
-              eint,ebool,
+              eint,ebool,estr,
               a,b,efun,
               c,d,epair,
               u,elist) ->
     ES.Typecase ((v,t), alpha,
-                 erase_types eint, erase_types ebool,
+                 erase_types eint, erase_types ebool, erase_types estr,
                  a,b,erase_types efun,
                  c,d,erase_types epair,
                  u,erase_types elist)                                        

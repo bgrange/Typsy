@@ -9,9 +9,11 @@ exception Type_error of string ;;
 				
 let op_type (op:operator) : typ =
   match op with
-  | Plus | Minus | Times | Div ->
+  | Plus | Minus | Times | Div | Mod ->
 			    FunTyp (IntTyp, FunTyp (IntTyp, IntTyp))
-  | Less | LessEq -> FunTyp (IntTyp, FunTyp (IntTyp, BoolTyp))
+  | Eq | Less | LessEq -> FunTyp (IntTyp, FunTyp (IntTyp, BoolTyp))
+  | And | Or -> FunTyp (BoolTyp, FunTyp (BoolTyp, BoolTyp))
+  | Concat -> FunTyp (StrTyp, (FunTyp (StrTyp, StrTyp)))
 
 let expect (t1:typ) (t2:typ) : unit =
   if t1 <> t2 then
@@ -20,7 +22,7 @@ let expect (t1:typ) (t2:typ) : unit =
 
 let rec is_polytype (t:typ) : bool =
   match t with
-  | BoolTyp | IntTyp | VarTyp _ -> false
+  | BoolTyp | IntTyp | StrTyp | VarTyp _ -> false
   | FunTyp (t1,t2) | PairTyp (t1,t2) -> is_polytype t1 || is_polytype t2
   | ListTyp u -> is_polytype u
   | Forall _ -> true
@@ -34,7 +36,8 @@ let rec typeof_ (ctx : typ SM.t) (tctx : unit SM.t) (e : exp) : typ =
   | Constant c ->
       (match c with
        | Int n -> IntTyp
-       | Bool b -> BoolTyp)
+       | Bool b -> BoolTyp
+       | Str s -> StrTyp)
   | Op (e1,op,e2) ->
      let e1_typ = typeof_ ctx tctx e1 in
      let e2_typ = typeof_ ctx tctx e2 in
@@ -99,6 +102,10 @@ let rec typeof_ (ctx : typ SM.t) (tctx : unit SM.t) (e : exp) : typ =
   | TypLam (v,e) ->
      let e_typ = typeof_ ctx (SM.add v () tctx) e in
      Forall (v, e_typ)
+  | TypRec (f,v,t,body) ->
+    let f_typ = Forall (v,t) in
+    let body_typ = typeof_ (SM.add f f_typ ctx) (SM.add v () tctx) body in
+    expect t body_typ; f_typ
   | TypApp (e,t) ->
     if is_polytype t
     then raise (Type_error "can't instantiate a type-function with a polytype")
@@ -109,7 +116,7 @@ let rec typeof_ (ctx : typ SM.t) (tctx : unit SM.t) (e : exp) : typ =
       | _ -> raise (Type_error "Expected a universal type"))
 
   | Typecase ((v,t),alpha,
-              eint,ebool,
+              eint,ebool,estr,
               a,b,efun,
               c,d,epair,
               u,elist) ->

@@ -1,26 +1,48 @@
 %{
+
 open Common
 open Lexing
 open ParsedSyntax
 
 exception Error
 
-let rec unpack_fun ids_and_types e : exp =
-  match ids_and_types with
-  | [] -> e
-  | (id,t)::ids' -> Fun (id,t,unpack_fun ids' e)
-
-let rec unpack_tfun args e =
-  match args with
-  | [] -> e
-  | arg::args' -> TypLam (arg, unpack_tfun args' e)
-
-
 let get_fun_typ args ret_typ : typ =
   List.fold_right
        (fun (_,t) t_acc -> FunTyp (t,t_acc))
        args
        ret_typ
+
+let get_tfun_typ ids ret_typ : typ =
+  List.fold_right
+       (fun id acc -> Forall (id,acc))
+       ids
+       ret_typ
+
+let rec unpack_fun ids_and_types e : exp =
+  match ids_and_types with
+  | [] -> e
+  | (id,t)::ids' -> Fun (id,t,unpack_fun ids' e)
+
+let rec unpack_tfun ids e =
+  match ids with
+  | [] -> e
+  | id::ids' -> TypLam (id,unpack_tfun ids' e)
+
+let rec unpack_rec f args ret_typ body =
+  match args with
+  | (a1,a1_typ)::args' ->
+    let f_of_a1_typ = get_fun_typ args' ret_typ in
+    Rec (f,a1,a1_typ,f_of_a1_typ,
+         unpack_fun args' body)
+  | [] -> raise (Failure "expected function argument")
+
+let rec unpack_trec f ids ret_typ body =
+  match ids with
+  | id1::ids' ->
+    let f_of_id1_typ = get_tfun_typ ids' ret_typ in
+    TypRec (f,id1,f_of_id1_typ,
+            unpack_tfun ids' body)
+  | [] -> raise (Failure "expected function argument")
 
 let unpack_let_rec f args ret_typ e1 e2 : exp =
   let f_typ = get_fun_typ args ret_typ in
@@ -41,16 +63,16 @@ let to_typ (t_opt:typ option) : typ =
   match t_opt with
   | None -> NoTyp
   | Some t -> t
-;;
-
-
+  ;;
 %}
 
-%token <int> INT	       
+%token <int> INT
+%token <string> STR
 %token TRUE
 %token FALSE
 %token LET
-%token REC  
+%token REC
+%token TREC
 %token IN
 %token ASSIGN
 %token CONS
@@ -73,15 +95,23 @@ let to_typ (t_opt:typ option) : typ =
 %token PLUS
 %token MINUS
 %token DIV
+%token MOD
+%token CONCAT
 %token ARROW
 %token BIG_ARROW
 %token PRODUCT
-%left PLUS MINUS
+%left PLUS MINUS CONCAT
 %left DIV
 %right PRODUCT ARROW
+%left MOD
 %token LESS
 %token LESSEQ
-%nonassoc LESS LESSEQ
+%token EQ
+%nonassoc LESS LESSEQ EQ
+%token AND
+%token OR
+%left OR
+%left AND
 %token FUN
 %token TFUN
 %token TYPECASE
@@ -95,6 +125,7 @@ let to_typ (t_opt:typ option) : typ =
 %token BOOL_TYP
 %token LIST_TYP
 %token INT_TYP
+%token STR_TYP
 %start <ParsedSyntax.exp> prog
 %%
 
@@ -118,6 +149,7 @@ typ2:
         | LPAREN; t = typ; RPAREN       { t }
         | BOOL_TYP                      { BoolTyp }
         | INT_TYP                       { IntTyp }
+        | STR_TYP                       { StrTyp }
         | LIST_TYP; t = typ2             { ListTyp t }
         | var = ID                      { VarTyp var }
         ;
@@ -140,9 +172,14 @@ exp:
                                                                       then unpack_let_rec f args (to_typ ret_typ) e1 e2
                                                                       else unpack_let f args (to_typ ret_typ) e1 e2 }
         | FUN; args = nonempty_list(arg); BIG_ARROW; body = exp;
-                                        { unpack_fun args body }
+                                    { unpack_fun args body }
+        | REC; f = ID; args = nonempty_list(arg);
+          ret_typ = option(colon_then_typ); BIG_ARROW; body = exp; 
+                                    { unpack_rec f args (to_typ ret_typ) body }
         | TFUN; args = nonempty_list(ID); BIG_ARROW; body = exp;
-                                        { unpack_tfun args body }
+                      { unpack_tfun args body }
+        | TREC; f = ID; args = nonempty_list(ID); ret_typ = option(colon_then_typ);
+                    BIG_ARROW; body = exp;         { unpack_trec f args (to_typ ret_typ) body }
         | IF; cond = exp;
                 THEN; then_exp = exp;
                 ELSE; else_exp = exp;
@@ -159,26 +196,31 @@ exp:
                                    { match matches with
                                      | [(IntTyp,eint);
                                         (BoolTyp,ebool);
+                                        (StrTyp,estr);
                                         (FunTyp(VarTyp a, VarTyp b),efun);
                                         (PairTyp(VarTyp c, VarTyp d),epair);
                                         (ListTyp(VarTyp f), elist)] -> Typecase (annot,t,
-                                                                                eint,
-                                                                                ebool,
+                                                                                eint,ebool,estr,
                                                                                 a,b,efun,
                                                                                 c,d,epair,
                                                                                 f,elist)
-                                     | _ -> print_endline (Show.show<(typ * exp) list> matches); raise Error }
+                                     | _ -> raise Error }
 
         | e = exp2                            { e }
     
             
 exp2:
         | e1 = exp2; PLUS ; e2 = exp2     { Op (e1, Plus, e2) }
+        | e1 = exp2; MOD; e2 = exp2       { Op (e1,Mod,e2) }            
+        | e1 = exp2; CONCAT; e2 = exp2    { Op (e1, Concat, e2) }  
         | e1 = exp2; MINUS ; e2 = exp2    { Op (e1, Minus, e2) }
         | e1 = exp2; DIV ; e2 = exp2      { Op (e1, Div, e2) }
         | e1 = exp2; PRODUCT ; e2 = exp2  { Op (e1, Times, e2) }        
         | e1 = exp2; LESS ; e2 = exp2     { Op (e1, Less, e2) }
         | e1 = exp2; LESSEQ ; e2 = exp2   { Op (e1, LessEq, e2) }
+        | e1 = exp2; EQ; e2 = exp2        { Op (e1, Eq, e2) }                        
+        | e1 = exp2; AND ; e2 = exp2      { Op (e1, And, e2) }
+        | e1 = exp2; OR ; e2 = exp2       { Op (e1, Or, e2) }                        
         | e1 = exp2; COMMA; e2 = exp2     { Pair (e1,e2) }
         | e1 = exp2; CONS; e2 = exp2;     { Cons (e1,e2) }
         | e = exp3                      { e }                                      
@@ -201,4 +243,5 @@ exp4:
         | TRUE                          { Constant (Bool true) }
         | FALSE                         { Constant (Bool false) }
         | n = INT                       { Constant (Int n) }
+        | s = STR                       { Constant (Str s) }
         ;

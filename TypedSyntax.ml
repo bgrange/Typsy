@@ -18,7 +18,7 @@ type exp =
   | Cons of exp * exp  
   | Match of exp * exp * variable * variable * exp  
   | Typecase of (variable*typ) * typ *
-                exp * exp *
+                exp * exp * exp *
                 variable * variable * exp *
                 variable * variable * exp *
                 variable * exp
@@ -26,10 +26,11 @@ type exp =
   (* Function *)
   | App of exp * exp
   | Fun of variable * typ * exp		   
-  | Rec of variable * typ * exp
+  | Rec of variable * variable * typ * typ * exp
 
   (* Type abstraction/application *)
   | TypLam of variable * exp
+  | TypRec of variable * variable * typ * exp
   | TypApp of exp * typ
               deriving (Show)
 

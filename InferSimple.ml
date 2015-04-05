@@ -10,7 +10,7 @@ type type_constraint = typ * typ
 				
 let op_type (op:operator) : typ =
   match op with
-  | Plus | Minus | Times | Div -> IntTyp
+  | Plus | Minus | Times | Div | Mod -> IntTyp
   | Less | LessEq -> BoolTyp
 
 let expect (t1:typ) (t2:typ) : unit =

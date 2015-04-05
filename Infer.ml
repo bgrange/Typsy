@@ -11,6 +11,7 @@ let rec convert_typ (t:typ) : T.typ =
   match t with
   | BoolTyp -> T.BoolTyp
   | IntTyp -> T.IntTyp
+  | StrTyp -> T.StrTyp                
   | FunTyp (t1,t2) -> T.FunTyp (convert_typ t1,
 				 convert_typ t2)
   | PairTyp (t1,t2) -> T.PairTyp (convert_typ t1,
@@ -42,15 +43,16 @@ let rec infer (e:exp) : TS.exp =
 				   convert_typ t2, infer e')
   | TypLam (v,e') -> TS.TypLam (v,infer e')
   | TypApp (e',t) -> TS.TypApp (infer e', convert_typ t)
+  | TypRec (v1,v2,t,e) -> TS.TypRec (v1,v2,convert_typ t,infer e)
   | Typecase (annot,t,
-              eint,ebool,
+              eint,ebool,estr,
               a,b,efun,
               c,d,epair,
               e,elist) ->
     (match annot with
      | Some (v,u) ->
        TS.Typecase ((v,convert_typ u),convert_typ t,
-                    infer eint, infer ebool,
+                    infer eint, infer ebool, infer estr,
                     a,b,infer efun,
                     c,d,infer epair,
                     e,infer elist)

@@ -27,10 +27,20 @@ let apply_op (v1:exp) (op:operator) (v2:exp) : exp =
          Constant (Int (i*j))
        | Constant (Int i), Div, Constant (Int j) -> 
          Constant (Int (i/j))
+       | Constant (Int i), Mod, Constant (Int j) ->
+         Constant (Int (i mod j))
        | Constant (Int i), Less, Constant (Int j) -> 
          Constant (Bool (i<j))
        | Constant (Int i), LessEq, Constant (Int j) -> 
          Constant (Bool (i<=j))
+       | Constant (Str s1), Concat, Constant (Str s2) ->
+         Constant (Str (s1 ^ s2))
+       | Constant (Int i), Eq, Constant (Int j) -> 
+         Constant (Bool (i = j))
+       | Constant (Bool b1), And, Constant (Bool b2) -> 
+         Constant (Bool (b1 && b2))
+       | Constant (Bool b1), Or, Constant (Bool b2) -> 
+         Constant (Bool (b1 || b2))           
        | _, _, _ -> raise (BadOp (v1,op,v2))
 
 let rec is_value (e:exp) : bool = 
@@ -51,7 +61,7 @@ let prune_env (env:'a SM.t) (fvars:SS.t) : 'a SM.t =
 let eval_typ (tenv:typ SM.t) (t:typ) : typ =
   let rec aux t b =
     match t with
-    | BoolTyp | IntTyp -> t
+    | BoolTyp | IntTyp | StrTyp -> t
     | FunTyp (t1,t2) -> FunTyp (aux t1 b, aux t2 b)
     | PairTyp (t1,t2) -> PairTyp (aux t1 b, aux t2 b)
     | ListTyp t1 -> ListTyp (aux t1 b)
@@ -65,7 +75,9 @@ let eval_typ (tenv:typ SM.t) (t:typ) : typ =
 
 (* evaluation; use eval_loop to recursively evaluate subexpressions *)
 let eval_body (env:exp SM.t) (tenv:typ SM.t)
-	      (eval_loop:exp SM.t -> typ SM.t -> exp -> exp) (e:exp) : exp =
+    (eval_loop:exp SM.t -> typ SM.t -> exp -> exp) (e:exp) : exp =
+(*  let bindings = SM.bindings env in
+  let tbindings = SM.bindings tenv in*)
   match e with
     | Var x -> 
       (try SM.find x env
@@ -130,15 +142,24 @@ let eval_body (env:exp SM.t) (tenv:typ SM.t)
     | TypLam (v,e',fvars,ftvars) ->
         Closure (prune_env env fvars,
                  prune_env tenv ftvars, v, e')
+    | TypRec (f,arg,body,fvars,ftvars) ->
+      RecClosure (prune_env env fvars,
+                  prune_env tenv ftvars,
+                  f,arg,body)
     | TypApp (e',t) ->
-       let ve' = eval_loop env tenv e' in
+      let ve' = eval_loop env tenv e' in
+      let closed_t = eval_typ tenv t in
        (match ve' with
 	| Closure (env_cl,tenv_cl,arg,body) ->
-           let tenv_cl' = SM.add arg t tenv_cl in
-	   eval_loop env_cl tenv_cl' body
+          let tenv_cl' = SM.add arg closed_t tenv_cl in
+	  eval_loop env_cl tenv_cl' body
+        | RecClosure (env_cl,tenv_cl,f,arg,body) ->
+          let tenv_cl' = SM.add arg closed_t tenv_cl in
+          let env_cl' = SM.add f ve' env_cl in
+          eval_loop env_cl' tenv_cl' body
         | _ -> raise (BadApplication e))
     | Typecase ((v,t),alpha,
-                eint,ebool,
+                eint,ebool,estr,
                 a,b,efun,
                 c,d,epair,
                 f,elist) ->
@@ -146,6 +167,7 @@ let eval_body (env:exp SM.t) (tenv:typ SM.t)
       (match closed_alpha with
        | BoolTyp -> eval_loop env tenv ebool
        | IntTyp -> eval_loop env tenv eint
+       | StrTyp -> eval_loop env tenv estr
        | FunTyp (t1,t2) ->
          let new_tenv = SM.add b t2 (SM.add a t1 tenv) in
          eval_loop env new_tenv efun
