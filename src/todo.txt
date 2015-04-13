@@ -1,4 +1,0 @@
--Possibly add let statements back in for efficiency's sake
--Fix typechecking of typecase statement
--Better error reporting
--More tests
