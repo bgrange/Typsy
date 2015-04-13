@@ -1,8 +1,4 @@
-
 open Common
-open Type  
-module ES = EvalSyntax
-
 open TypedSyntax
 
 let next_varid = ref 0 ;;  
@@ -13,18 +9,23 @@ let rec gen_var (avoid:SS.t) () : variable =
 ;;
 
 
-
 let rec _free_tvars_in_typ t bound =
   match t with
-  | BoolTyp | IntTyp | StrTyp -> SS.empty
-  | FunTyp (t1,t2) | PairTyp (t1,t2) ->
-		      SS.union (_free_tvars_in_typ t1 bound)
-			       (_free_tvars_in_typ t2 bound)
-  | ListTyp t1 -> _free_tvars_in_typ t1 bound
-  | Forall (v,t') -> _free_tvars_in_typ t' (SS.add v bound)		       
-  | VarTyp v -> if SS.mem v bound then SS.empty else SS.singleton v
-  
-  
+  | BoolT | IntT | StrT | VoidT -> SS.empty
+  | FunT (t1,t2) | PairT (t1,t2)
+  | TAppT (t1,t2) ->
+    SS.union (_free_tvars_in_typ t1 bound)
+      (_free_tvars_in_typ t2 bound)
+  | ListT t1 -> _free_tvars_in_typ t1 bound
+  | ForallT (v,k,t') | TFunT (v,k,t') -> _free_tvars_in_typ t' (SS.add v bound)
+  | TRecT (f,v,k1,k2,t') -> _free_tvars_in_typ t' (SS.add f (SS.add v bound))
+  | VarT v -> if SS.mem v bound then SS.empty else SS.singleton v
+  | TCaseT (t1,t2,t3,t4,t5,t6,t7) ->
+    let types = [t1;t2;t3;t4;t5;t6;t7] in
+    List.fold_right
+      (fun t acc -> SS.union (_free_tvars_in_typ t bound) acc)
+      types SS.empty
+    
 let free_tvars_in_typ (t:typ) : SS.t =
   _free_tvars_in_typ t SS.empty
 ;;
@@ -49,23 +50,19 @@ let free_tvars (e:exp) : SS.t =
     | Fun (_,t,e') ->
        SS.union (_free_tvars_in_typ t bound) (aux e' bound)
     | EmptyList t -> _free_tvars_in_typ t bound
-    | TypApp (e',t) -> SS.union (aux e' bound) (_free_tvars_in_typ t bound)
-    | TypLam (v,e) -> aux e (SS.add v bound)
-    | TypRec (_,_,t,e') -> SS.union (_free_tvars_in_typ t bound) (aux e' bound)
-    | Typecase ((v,t),alpha,
+    | TApp (e',t) -> SS.union (aux e' bound) (_free_tvars_in_typ t bound)
+    | TFun (v,_,e) -> aux e (SS.add v bound)
+    | TRec (f,v,_,t,e') ->
+      SS.union
+        (_free_tvars_in_typ t bound)
+        (aux e' (SS.add v bound))
+    | Closure _ | RecClosure _ -> SS.empty
+    | TCase (tyop,alpha,
                 eint,ebool,estr,
-                a,b,efun,
-                c,d,epair,
-                e,elist) ->
-      let int_free = aux eint bound in
-      let bool_free = aux ebool bound in
-      let fun_free = aux efun (SS.add b (SS.add a bound)) in
-      let pair_free = aux epair (SS.add c (SS.add d bound)) in
-      let list_free = aux elist (SS.add e bound) in 
-      SS.union (SS.union (SS.union int_free bool_free)
-                  (SS.union fun_free pair_free)
-               )
-        list_free
+                efun,epair,elist) ->
+      let exps = [eint;ebool;efun;epair;elist] in
+      List.fold_right (fun e acc -> SS.union (aux e bound) acc)
+        exps (_free_tvars_in_typ alpha bound)
   in     
   aux e SS.empty
 
@@ -75,19 +72,44 @@ let rec sub_in_typ (t:typ) (v:variable) (u:typ) : typ =
   let fvars = free_tvars_in_typ u in
   let rec aux t =
     match t with
-    | BoolTyp | IntTyp | StrTyp -> t
-    | FunTyp (t1,t2) -> FunTyp (aux t1, aux t2)
-    | PairTyp (t1,t2) -> PairTyp (aux t1, aux t2)
-    | ListTyp t1 -> ListTyp (aux t1)
-    | VarTyp v' -> if var_eq v v' then u else t
-    | Forall (v',t') -> if var_eq v v' then t
-			else if SS.mem v' fvars then
-			  let avoid_vars = SS.union fvars (free_tvars_in_typ t') in
-			  let w = gen_var avoid_vars () in
-			  let t'_renamed = sub_in_typ t' v' (VarTyp w) in
-			  Forall (w, aux t'_renamed)
-		        else
-			  Forall (v',aux t')
+    | BoolT | IntT | StrT | VoidT -> t
+    | FunT (t1,t2) -> FunT (aux t1, aux t2)
+    | PairT (t1,t2) -> PairT (aux t1, aux t2)
+    | ListT t1 -> ListT (aux t1)
+    | VarT v' -> if var_eq v v' then u else t
+    | ForallT (v',k,t') ->
+      if var_eq v v' then t
+      else if SS.mem v' fvars then
+	let avoid_vars = SS.union fvars (free_tvars_in_typ t') in
+	let w = gen_var avoid_vars () in
+	let t'_renamed = sub_in_typ t' v' (VarT w) in
+        ForallT (w, k,aux t'_renamed)
+      else
+	ForallT (v',k,aux t')
+    | TAppT (t1,t2) -> TAppT (aux t1, aux t2)
+    | TFunT (v',k,t') ->
+      if var_eq v v' then t
+      else if SS.mem v' fvars then
+	let avoid_vars = SS.union fvars (free_tvars_in_typ t') in
+	let w = gen_var avoid_vars () in
+	let t'_renamed = sub_in_typ t' v' (VarT w) in
+	TFunT (w, k,aux t'_renamed)
+      else
+	TFunT (v',k,aux t')
+    | TRecT (f,w,k1,k2,t') ->
+      if var_eq v f || var_eq v w then t
+      else if SS.mem w fvars || SS.mem f fvars then
+        let avoid_vars = SS.union fvars (free_tvars_in_typ t') in
+        let f' = gen_var avoid_vars () in
+        let w' = gen_var avoid_vars () in
+        let t'_renamed = sub_in_typ (sub_in_typ t' w (VarT w')) f (VarT f') in
+        TRecT (f',w',k1,k2,aux t'_renamed)
+      else
+        TRecT (f,w,k1,k2,aux t')
+    | TCaseT (t1,t2,t3,t4,t5,t6,t7) ->
+      TCaseT (aux t1, aux t2,
+              aux t3, aux t4,
+              aux t5, aux t6, aux t7)
   in
   aux t
 
@@ -125,77 +147,58 @@ let free_vars (e:exp) : SS.t =
     | App (e1,e2) ->  
         SS.union (aux e1 bound)
                  (aux e2 bound)
-    | TypLam (_,e') -> aux e' bound
-    | TypApp (e',_) -> aux e' bound
-    | TypRec (f,v,t,e') -> aux e' bound
-    | Typecase ((v,t),alpha,
+    | TFun (_,_,e') -> aux e' bound
+    | TApp (e',_) -> aux e' bound
+    | TRec (f,v,k,t,e') -> aux e' bound
+    | Closure _ | RecClosure _ -> SS.empty
+    | TCase (tyop,alpha,
                 eint,ebool,estr,
-                a,b,efun,
-                c,d,epair,
-                e,elist) ->
+                efun,epair,elist) ->
       let exps = [eint;ebool;efun;epair;elist] in
       List.fold_right (fun e acc -> SS.union (aux e bound) acc) exps SS.empty
         
   in aux e SS.empty
 ;;
 
+let rec normalize_type (t:typ) : typ =
+  match t with
+  | BoolT | IntT | StrT | VarT _ | VoidT -> t
+  | FunT (t1,t2) -> FunT (normalize_type t1,
+                          normalize_type t2)
+  | PairT (t1,t2) -> PairT (normalize_type t1,
+                            normalize_type t2)
+  | ListT u -> ListT (normalize_type u)
+  | ForallT (v,k,t') -> ForallT (v,k,normalize_type t')
+  | TFunT (v,k,t') -> TFunT (v,k,normalize_type t')
+  | TRecT (f,v,k1,k2,t') -> TRecT (f,v,k1,k2,normalize_type t')
+  | TAppT (t1,t2) ->
+    let t1' = normalize_type t1 in
+    let t2' = normalize_type t2 in
+    (match t1' with
+     | TFunT (v,k,t1'_body) ->
+       let subbed = sub_in_typ t1'_body v t2' in
+       normalize_type subbed
+     | TRecT (f,v,k1,k2,t1'_body) ->
+       let subbed = sub_in_typ t1'_body v t2' in
+       let subbed = sub_in_typ subbed f t1' in
+       normalize_type subbed
+     | _ -> TAppT (t1',t2'))
+  | TCaseT (alpha,tint,tbool,tstr,
+            tfun,tpair,tlist) ->
+    let alpha = normalize_type alpha in
+    (* typechecker guarantees that alpha has kind *
+       and isn't a universal type *)
+    (match alpha with
+     | IntT -> tint
+     | BoolT -> tbool
+     | StrT -> tstr
+     | FunT (a,b) -> normalize_type (TAppT (TAppT (tfun, a),b))
+     | PairT (a,b) -> normalize_type (TAppT (TAppT (tpair, a), b))
+     | ListT a -> normalize_type (TAppT (tlist,a))
+     | VarT _ -> t
+     | _ -> raise (Failure "bad Typecase"))
 
-(* two closed terms here *)
-let rec typ_eq (t:typ) (u:typ) : bool =
-  match t, u with
-  | BoolTyp, BoolTyp | IntTyp, IntTyp -> true
-  | FunTyp (t1,t2), FunTyp (u1,u2)
-  | PairTyp (t1,t2), PairTyp (u1,u2) -> (typ_eq t1 u1) && (typ_eq t2 u2)
-  | ListTyp t', ListTyp u' -> typ_eq t' u'
-  | Forall (tv, t'), Forall (uv, u') ->
-      let u'' = if var_eq uv tv
-                then u
-                else sub_in_typ u' uv (VarTyp tv)
-      in
-      typ_eq t' u''
-  | _ -> raise (Failure "expected closed terms")
-
-let rec erase_types (te:exp) : ES.exp =
-  match te with
-  | Var v -> ES.Var v
-  | Constant c -> ES.Constant c
-  | Op (e1,op,e2) -> ES.Op ((erase_types e1), op,
-                               (erase_types e2))
-  | If (e1,e2,e3) -> ES.If ((erase_types e1),
-                               (erase_types e2),
-                               (erase_types e3))
-  | Pair (e1,e2) -> ES.Pair ((erase_types e1), (erase_types e2))
-  | Fst e -> ES.Fst (erase_types e)
-  | Snd e -> ES.Snd (erase_types e)
-  | EmptyList _ -> ES.EmptyList
-  | Cons (e1,e2) -> ES.Cons ((erase_types e1), (erase_types e2))                         
-  | Match (e1,e2,v1,v2,e3) -> ES.Match ((erase_types e1), (erase_types e2),
-                                        v1,v2, (erase_types e3))
-  | App (e1,e2) -> ES.App (erase_types e1,erase_types e2)
-  | Fun (v,_,e) -> ES.Fun (v,erase_types e,
-                           free_vars e,
-                           free_tvars e)
-  | Rec (v1,v2,_,_,e) -> ES.Rec (v1,v2,erase_types e,
-                                 free_vars e,
-                                 free_tvars e)
-  | TypRec (v1,v2,_,e) -> ES.TypRec (v1,v2,erase_types e,
-                                      free_vars e,
-                                      free_tvars e)
-  | TypLam (v,e) -> ES.TypLam (v, erase_types e,
-                               free_vars e,
-                               free_tvars e)
-  | TypApp (e,t) -> ES.TypApp (erase_types e, t)
-  | Typecase ((v,t),alpha,
-              eint,ebool,estr,
-              a,b,efun,
-              c,d,epair,
-              u,elist) ->
-    ES.Typecase ((v,t), alpha,
-                 erase_types eint, erase_types ebool, erase_types estr,
-                 a,b,erase_types efun,
-                 c,d,erase_types epair,
-                 u,erase_types elist)                                        
-
+(*
 
 (* u should be a closed type, t can be open *)  
 (* raise exception if unification fails *)
@@ -210,14 +213,15 @@ let rec unify (t:typ)  (u:typ) : typ SM.t =
     | None, None -> None
   in
   match t, u with
-  | IntTyp,IntTyp | BoolTyp,BoolTyp -> SM.empty
-  | VarTyp v, _ -> SM.singleton v u			     
-  | FunTyp (t1,t2), FunTyp (u1,u2)
-  | PairTyp (t1,t2), PairTyp (u1,u2) -> SM.merge merge_fun
+  | IntT,IntT | BoolT,BoolT -> SM.empty
+  | VarT v, _ -> SM.singleton v u			     
+  | FunT (t1,t2), FunT (u1,u2)
+  | PairT (t1,t2), PairT (u1,u2) -> SM.merge merge_fun
                                         (unify t1 u1) (unify t2 u2)
-  | ListTyp t', ListTyp u' -> unify t' u'
-  | Forall (tv, t'), Forall (uv,u') ->
-                  let u'' = sub_in_typ u' uv (VarTyp tv) in
+  | ListT t', ListT u' -> unify t' u'
+  | ForallT (tv, t'), ForallT (uv,u') ->
+                  let u'' = sub_in_typ u' uv (VarT tv) in
                   SM.remove tv (unify t' u'')
   | _ -> raise (Failure "unification failed")
 				       
+         *)

@@ -1,6 +1,5 @@
-open EvalSyntax
+open TypedSyntax
 open Common
-open Type
 
 let string_of_const c = 
   match c with 
@@ -23,16 +22,40 @@ let string_of_op op =
     | Or -> "||"
     | Concat -> "++"
 
+let rec string_of_kind k =
+  match k with
+  | TypeK -> "*"
+  | ArrowK (k1,k2) -> Printf.sprintf
+                        "(%s -> %s)"
+                        (string_of_kind k1)
+                        (string_of_kind k2)
+
 let rec string_of_typ typ =
   match typ with
-  | BoolTyp -> "bool"
-  | IntTyp -> "int"
-  | StrTyp -> "str"
-  | FunTyp (a,b) -> Printf.sprintf "(%s -> %s)" (string_of_typ a) (string_of_typ b)
-  | PairTyp (a,b) -> Printf.sprintf "(%s * %s)" (string_of_typ a) (string_of_typ b)
-  | ListTyp a -> Printf.sprintf "list %s" (string_of_typ a)
-  | VarTyp v -> v
-  | Forall (v,t) -> Printf.sprintf "forall %s, %s" v (string_of_typ t)
+  | BoolT -> "bool"
+  | IntT -> "int"
+  | StrT -> "str"
+  | FunT (a,b) -> Printf.sprintf "(%s -> %s)" (string_of_typ a) (string_of_typ b)
+  | PairT (a,b) -> Printf.sprintf "(%s * %s)" (string_of_typ a) (string_of_typ b)
+  | ListT a -> Printf.sprintf "list %s" (string_of_typ a)
+  | VarT v -> v
+  | ForallT (v,k,t) -> Printf.sprintf "forall %s::%s, %s"
+                         v (string_of_kind k)
+                         (string_of_typ t)
+  | TAppT (t1,t2) -> Printf.sprintf
+                      "%s %s"
+                      (string_of_typ t1)
+                      (string_of_typ t2)
+                      
+  | TFunT (v,k,t) -> Printf.sprintf
+                     "(Tfun %s::%s => %s)"
+                     v (string_of_kind k) (string_of_typ t)
+  | TRecT (f,v,k1,k2,t) -> Printf.sprintf
+                              "(Trec %s (%s::%s) :: %s => %s)"
+                              f v (string_of_kind k1)
+                              (string_of_kind k2)
+                              (string_of_typ t)
+  | TCaseT _ -> "<Typecase>"
 
 (* Printing functions *)		      
 		      
@@ -59,20 +82,20 @@ let precedence e =
     | Fst _ -> 1
     | Snd _ -> 1
 
-    | EmptyList -> 0
+    | EmptyList _ -> 0
     | Cons _ -> 8
     | Match _ -> max_prec
 
     | Rec _ -> max_prec
-    | TypRec _ -> max_prec
+    | TRec _ -> max_prec
     | Fun _ -> max_prec		 
     | Closure _ -> max_prec
     | RecClosure _ -> max_prec		     
     | App _ ->  1
 
-    | TypLam _ -> max_prec
-    | TypApp _ -> 1
-    | Typecase _ -> max_prec
+    | TFun _ -> max_prec
+    | TApp _ -> 1
+    | TCase _ -> max_prec
 
 		    
 let rec exp2string prec e = 
@@ -92,26 +115,34 @@ let rec exp2string prec e =
       | Fst e1 ->  "fst " ^ (exp2string p e1)
       | Snd e1 ->  "snd " ^ (exp2string p e1)
 
-      | EmptyList -> "[]"
+      | EmptyList _ -> "[]"
       | Cons (e1,e2) -> (exp2string p e1) ^ "::" ^ (exp2string prec e2) 
       | Match (e1,e2,hd,tl,e3) -> 
 	  "match " ^ (exp2string max_prec e1) ^ 
 	    " with [] -> " ^ (exp2string max_prec e2) ^ 
             " | " ^ hd ^ "::" ^ tl ^ " -> " ^ (exp2string p e3)
 
-      | Rec (f,x,body,_,_) -> Printf.sprintf "rec %s %s -> %s" f x (exp2string max_prec body)
-      | Fun (x,body,_,_) -> Printf.sprintf "fun %s -> %s" x
+      | Rec (f,x,tx,tbody,body) -> Printf.sprintf
+                                     "rec %s (%s:%s) : %s => %s"
+                                     f x (string_of_typ tx) (string_of_typ tbody)
+                                     (exp2string max_prec body)
+      | Fun (x,t,body) -> Printf.sprintf "fun (%s:%s) => %s" x
+                            (string_of_typ t)
 	                      (exp2string max_prec body)		     		  
       | App (e1,e2) -> Printf.sprintf "%s %s" (exp2string p e1) (exp2string p e2)
-      | TypLam (v,body,_,_) -> Printf.sprintf "tfun %s -> %s" v (exp2string p body)
-      | TypRec (f,x,body,_,_) -> Printf.sprintf "trec %s %s -> %s" f x (exp2string max_prec body)
-      | TypApp (e',t) -> Printf.sprintf "%s [%s]" (exp2string p e') (string_of_typ t)
+      | TFun (v,k,body) -> Printf.sprintf "tfun (%s::%s) => %s"
+                               v (string_of_kind k) (exp2string p body)
+      | TRec (f,x,k,t,body) -> Printf.sprintf "trec %s (%s::%s) : %s => %s"
+                                   f x (string_of_kind k) (string_of_typ t)
+                                   (exp2string max_prec body)
+      | TApp (e',t) -> Printf.sprintf "%s [%s]" (exp2string p e') (string_of_typ t)
       | Closure _ | RecClosure _ -> "<closure>"
-      | Typecase ((v,t),alpha,
+      | TCase (tyop,alpha,
                   eint,ebool,estr,
-                  a,b,efun,
-                  c,d,epair,
-                  e,elist) ->
+                  efun,
+                  epair,
+                  elist) -> "<typecase>"
+(*
 	Printf.sprintf "typecase [%s. %s] %s of\n\
                         | %s => %s\n\
                         | %s => %s\n\
@@ -119,11 +150,11 @@ let rec exp2string prec e =
                         | %s => %s\n\
                         | %s => %s"
           v (string_of_typ t) (string_of_typ alpha)
-          (string_of_typ IntTyp) (exp2string p eint)
-          (string_of_typ BoolTyp) (exp2string p ebool)
-          (string_of_typ (FunTyp (VarTyp a,VarTyp b))) (exp2string p efun)
-          (string_of_typ (PairTyp (VarTyp c,VarTyp d))) (exp2string p epair)
-          (string_of_typ (ListTyp (VarTyp e))) (exp2string p elist)
+          (string_of_typ IntT) (exp2string p eint)
+          (string_of_typ BoolT) (exp2string p ebool)
+          (string_of_typ (FunT (VarT a,VarT b))) (exp2string p efun)
+          (string_of_typ (PairT (VarT c,VarT d))) (exp2string p epair)
+          (string_of_typ (ListT (VarT e))) (exp2string p elist) *)
   in 
   if p > prec then "(" ^ s ^ ")" else s
 

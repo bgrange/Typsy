@@ -15,6 +15,16 @@ in
 let bool_to_string (b:bool) : str =
   if b then "true" else "false"
 in
+let fold:forall a. forall b. (a -> b -> b) -> b -> list a -> b =
+    tfun a b => 
+    let rec foldab (f:a -> b -> b) (base:b) (l:list a) : b =
+      match l with
+      | nil => base
+      | hd::tl => (f hd (foldab f base tl)) 
+      end
+    in
+    foldab
+in
 let to_string : (forall a. a -> str) =
  trec aux a : a -> str =>
  typecase [d.d -> str] a of
@@ -23,9 +33,7 @@ let to_string : (forall a. a -> str) =
  | str => (fun (s:str) => s)
  | b -> c => (fun (f: b -> c) => "<function>")
  | b * c => (fun (p: b * c) => "(" ++ (aux [b] (fst p)) ++ "," ++ (aux [c] (snd p)) ++ ")")
- | list b => (fun (l:list b) => "list")
+ | list b => (fun (l:list b) => fold [b] [str] (fun (x:b) (s:str) => (aux [b] x) ++ s) "" l)
  end
 in
-to_string [(int * bool) * str] (((2 + 34),(true && false)),("cock" ++ " semen"))
-
-  
+fold [int] [int] (fun (x:int) (y:int) => x + y) 0 (1::2::3::4::5::6::7::(nil:list int))

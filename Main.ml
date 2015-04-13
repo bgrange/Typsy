@@ -3,7 +3,7 @@
 open Core.Std
 open ParseEval   ;;
 
-let default_file = "test/typerec.myml" ;;
+let default_file = "test/tfun.myml" ;;
 
 let do_it file_opt debug () =
   let f =

@@ -1,7 +1,7 @@
-let rec test
-typecase [d.int] int*int  of
+typecase [TFun (d::*) => int] int*int  of
 | int => 10
 | bool => 5
+| str => 1234
 | a -> b => 33
 | a * b => 35
 | list a => 3400

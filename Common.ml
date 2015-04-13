@@ -15,4 +15,25 @@ type operator = Plus | Minus | Times | Div | Mod | Less | LessEq | Concat |
 module SS = Set.Make(String)
 module SM = Map.Make(String)
 
-						      
+(*
+module SS = struct
+  include Set.Make(String)
+  module Show_t :
+    Deriving_Show.Show with type a = t =
+    Deriving_Show.Defaults(struct
+      type a = t
+      let format formatter _ =
+        Format.fprintf formatter "<set>"
+    end)
+end
+  
+module SM = struct
+  include Map.Make(String)
+  module Show_t :
+    Deriving_Show.Show with type 'x a = 'x t =
+    Deriving_Show.Defaults(struct
+      type 'x a = 'x t
+      let format formatter _ =
+        Format.fprintf formatter "<map>"
+    end)
+end *)

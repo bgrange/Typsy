@@ -1,4 +1,4 @@
-  let aux (n:int) (acc:int) : int =
+  let aux n (acc:int) : int =
     if n <= 1 then acc
     else aux (n - 1) (n * acc)
   in

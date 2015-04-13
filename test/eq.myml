@@ -1,0 +1,9 @@
+(TRec Eq (a::*) :: * =>
+Typecase a of
+| int => int
+| bool => bool
+| str => str
+| s -> t => void
+| s * t => (Eq [s]) * (Eq [t])
+| list s => list (Eq [s])
+end)

@@ -10,24 +10,24 @@ type type_constraint = typ * typ
 				
 let op_type (op:operator) : typ =
   match op with
-  | Plus | Minus | Times | Div | Mod -> IntTyp
-  | Less | LessEq -> BoolTyp
+  | Plus | Minus | Times | Div | Mod -> IntT
+  | Less | LessEq -> BoolT
 
 let expect (t1:typ) (t2:typ) : unit =
   if t1 <> t2 then
     raise (Type_error ("expected " ^ (string_of_typ t1) ^ ", got " ^ (string_of_typ t2)))
 
 let gen_var_typ (id:int) : typ =
-  VarTyp ("'a" ^ (string_of_int id))
+  VarT ("'a" ^ (string_of_int id))
 	  
 let rec accum_type_vars_in_typ (t:typ) : SS.t =
   match t with
-  | BoolTyp | IntTyp -> SS.empty
-  | FunTyp (t1,t2) | PairTyp (t1,t2) ->
+  | BoolT | IntT -> SS.empty
+  | FunT (t1,t2) | PairT (t1,t2) ->
 		      SS.union (accum_type_vars_in_typ t1)
 			       (accum_type_vars_in_typ t2)
-  | ListTyp t1 -> accum_type_vars_in_typ t1
-  | VarTyp v -> SS.singleton v					 
+  | ListT t1 -> accum_type_vars_in_typ t1
+  | VarT v -> SS.singleton v					 
   			       
   
 let accum_type_vars_in_exp (e:exp) : SS.t =
@@ -53,11 +53,11 @@ let accum_type_vars_in_exp (e:exp) : SS.t =
   		   
 let rec sub_in_typ (t:typ) (map:typ SM.t) : typ =
   match t with
-  | BoolTyp | IntTyp -> t
-  | FunTyp (t1,t2) -> FunTyp (sub_in_typ t1 map, sub_in_typ t2 map)
-  | PairTyp (t1,t2) -> PairTyp (sub_in_typ t1 map, sub_in_typ t2 map)
-  | ListTyp t1 -> ListTyp (sub_in_typ t1 map)
-  | VarTyp x -> try SM.find x map with Not_found -> t
+  | BoolT | IntT -> t
+  | FunT (t1,t2) -> FunT (sub_in_typ t1 map, sub_in_typ t2 map)
+  | PairT (t1,t2) -> PairT (sub_in_typ t1 map, sub_in_typ t2 map)
+  | ListT t1 -> ListT (sub_in_typ t1 map)
+  | VarT x -> try SM.find x map with Not_found -> t
 
 let rec sub_in_exp (e:exp) (map:typ SM.t) : exp =
   match e with
@@ -100,18 +100,18 @@ let rec typeof_ (ctx : context) (e : exp) (id:int) :
       with Not_found -> raise (Type_error ("unbound variable " ^ v)))
   | Constant c ->
       (match c with
-       | Int n -> (IntTyp, [], id)
-       | Bool b -> (BoolTyp, [], id))
+       | Int n -> (IntT, [], id)
+       | Bool b -> (BoolT, [], id))
   | Op (e1,op,e2) ->
      let (e1_typ, cs1, id')  = typeof_ ctx e1 id in
      let (e2_typ, cs2, id'') = typeof_ ctx e2 id' in
-     let cs = (e1_typ,IntTyp)::(e2_typ,IntTyp)::(cs1 @ cs2) in
+     let cs = (e1_typ,IntT)::(e2_typ,IntT)::(cs1 @ cs2) in
      (op_type op, cs, id'')
   | If (cond,e1,e2) ->
      let (cond_typ, cs_cond, id') = typeof_ ctx cond id in
      let (e1_typ, cs1, id'') = typeof_ ctx e1 id' in
      let (e2_typ, cs2, id''') = typeof_ ctx e2 id'' in
-     let cs = (cond_typ,BoolTyp)::(e1_typ,e2_typ)::(cs_cond @ cs1 @ cs2) in
+     let cs = (cond_typ,BoolT)::(e1_typ,e2_typ)::(cs_cond @ cs1 @ cs2) in
      (e1_typ, cs, id''')
   | Let (v, e1, e2) ->
      let e1_typ, cs1, id' = typeof_ ctx e1 id in
@@ -121,36 +121,36 @@ let rec typeof_ (ctx : context) (e : exp) (id:int) :
   | Pair (e1,e2) ->
      let (e1_typ, cs1, id') = typeof_ ctx e1 id in
      let (e2_typ, cs2, id'') = typeof_ ctx e2 id' in
-     (PairTyp (e1_typ, e2_typ), cs1 @ cs2, id'')
+     (PairT (e1_typ, e2_typ), cs1 @ cs2, id'')
   | Fst p ->
      let p_typ, cs, id' = typeof_ ctx p id in
      let vartyp1 = gen_var_typ id' in
      let vartyp2 = gen_var_typ (id'+1) in
-     let constr = (p_typ, PairTyp(vartyp1, vartyp2)) in
+     let constr = (p_typ, PairT(vartyp1, vartyp2)) in
      (vartyp1, constr::cs, id'+2)
   | Snd p ->
      let p_typ, cs, id' = typeof_ ctx p id in
      let vartyp1 = gen_var_typ id' in
      let vartyp2 = gen_var_typ (id'+1) in
-     let constr = (p_typ, PairTyp(vartyp1, vartyp2)) in
+     let constr = (p_typ, PairT(vartyp1, vartyp2)) in
      (vartyp2, constr::cs, id'+2)
-  | EmptyList t -> (ListTyp t, [], id)
+  | EmptyList t -> (ListT t, [], id)
   | Cons (hd,tl) ->
      let (hd_typ, cshd, id') = typeof_ ctx hd id in
      let (tl_typ, cstl, id'') = typeof_ ctx tl id' in
-     let constr = (ListTyp hd_typ, tl_typ) in
-     (ListTyp hd_typ, constr::(cshd @ cstl), id'')
+     let constr = (ListT hd_typ, tl_typ) in
+     (ListT hd_typ, constr::(cshd @ cstl), id'')
   | Match (match_on, empty_case, hd_var, tl_var, cons_case) ->
      let match_on_typ, cs1, id' = typeof_ ctx match_on id in
      let vartyp = gen_var_typ id' in
      let empty_case_typ, cs2, id'' = typeof_ ctx empty_case (id'+1) in
-     let new_ctx = (hd_var, vartyp)::(tl_var,ListTyp vartyp)::ctx in
+     let new_ctx = (hd_var, vartyp)::(tl_var,ListT vartyp)::ctx in
      let cons_case_typ, cs3, id''' = typeof_ new_ctx cons_case id'' in
-     let constr1 = (match_on_typ, ListTyp vartyp) in
+     let constr1 = (match_on_typ, ListT vartyp) in
      let constr2 = (empty_case_typ, cons_case_typ) in
      (cons_case_typ, constr1::constr2::(cs1 @ cs2 @ cs3), id''') 
   | Rec (name,arg,arg_typ,body_typ,body) ->
-     let rec_typ = FunTyp(arg_typ,body_typ) in
+     let rec_typ = FunT(arg_typ,body_typ) in
      let new_ctx = (name,rec_typ)::(arg,arg_typ)::ctx in
      let body_typ', cs, id' = typeof_ new_ctx body id in
      (rec_typ, (body_typ,body_typ')::cs, id')
@@ -159,7 +159,7 @@ let rec typeof_ (ctx : context) (e : exp) (id:int) :
      let e1_typ, cs1, id' = typeof_ ctx e1 id in
      let e2_typ, cs2, id'' = typeof_ ctx e2 id' in
      let vartyp = gen_var_typ id'' in
-     let constr = (e1_typ, FunTyp(e2_typ, vartyp)) in
+     let constr = (e1_typ, FunT(e2_typ, vartyp)) in
      (vartyp, constr::(cs1 @ cs2), id''+1)
        
 let typeof (e:exp) =
@@ -183,7 +183,7 @@ let rec unify (cs:type_constraint list) : typ SM.t =
   | ((t1,t2)::cs') ->
      if t1 = t2 then unify cs' else
      (match t1,t2 with
-      | VarTyp v, t | t, VarTyp v ->
+      | VarT v, t | t, VarT v ->
 	 let t_vars = accum_type_vars_in_typ t in
 	 if SS.mem v t_vars then raise (Type_error "unification failed")
          else
@@ -199,16 +199,16 @@ let rec unify (cs:type_constraint list) : typ SM.t =
 	   let ret_list = SM.bindings ret in
 	   ret
 			     
-      | FunTyp (t1,t2), FunTyp (t1',t2') -> unify ((t1,t1')::(t2,t2')::cs')
-      | PairTyp (t1,t2), PairTyp (t1',t2') -> unify ((t1,t1')::(t2,t2')::cs')
-      | ListTyp t, ListTyp t' -> unify ((t,t')::cs')
+      | FunT (t1,t2), FunT (t1',t2') -> unify ((t1,t1')::(t2,t2')::cs')
+      | PairT (t1,t2), PairT (t1',t2') -> unify ((t1,t1')::(t2,t2')::cs')
+      | ListT t, ListT t' -> unify ((t,t')::cs')
       | _ -> raise (Type_error "unification failed"))
 				       
 let map =
-  Rec ("map", "f", VarTyp "'a4", VarTyp "'a2",
-    Rec ("mapf", "l", VarTyp "'c", VarTyp "'d",
+  Rec ("map", "f", VarT "'a4", VarT "'a2",
+    Rec ("mapf", "l", VarT "'c", VarT "'d",
       Match (Var "l",
-                    EmptyList (VarTyp "'e"),
+                    EmptyList (VarT "'e"),
         "hd", "tl", Cons (Op (App (Var "f", Var "hd"), Plus, Constant (Int 1)),
                           App (Var "mapf", Var "tl")))))
 

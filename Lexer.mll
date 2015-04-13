@@ -26,18 +26,18 @@ rule read =
   | "let"    { LET }
   | "rec"    { REC }
   | "in"     { IN }
-  | "typecase" { TYPECASE }
+  | "typecase" { TCASE }    
   | "of"     { OF }
   | "end"    { END }     
   | '='      { ASSIGN }
-  | "::"     { CONS }
+  | "::"     { DOUBLE_COLON }
   | "nil"    { NIL }
   | '['      { LBRACK }
   | ']'      { RBRACK }	     
   | '('      { LPAREN }
   | ')'      { RPAREN }
   | ':'      { COLON }
-  | '*'      { PRODUCT }	     
+  | '*'      { STAR }	     
   | "->"     { ARROW }
   | "=>"     { BIG_ARROW }
   | "match"  { MATCH }
@@ -48,7 +48,7 @@ rule read =
   | "str"    { STR_TYP }         
   | "bool"   { BOOL_TYP }
   | "list"   { LIST_TYP }
-
+  | "void"   { VOID_TYP }
   | '.'      { DOT }
   | "if"     { IF }
   | "then"   { THEN }
@@ -65,7 +65,10 @@ rule read =
   | "++"     { CONCAT }
   | "fun"    { FUN }
   | "tfun"   { TFUN }
-  | "trec"   { TREC }         
+  | "trec"   { TREC }
+  | "TFun"   { TFUNT }
+  | "TRec"   { TRECT }
+  | "Typecase"   { TCASET }         
   | "fst"    { FST }
   | "snd"    { SND }
   | id       { ID (Lexing.lexeme lexbuf) }

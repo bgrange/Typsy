@@ -3,8 +3,7 @@
 (*************************************************)
 
 open Common
-open EvalSyntax
-open Type  
+open TypedSyntax
 open Util
        
 exception BadList of exp
@@ -14,7 +13,7 @@ exception BadIf of exp
 exception BadMatch of exp 
 exception BadOp of exp * operator * exp 
 exception BadPair of exp
-exception BadTypecase of exp
+exception BadTCase of exp
     
 
 let apply_op (v1:exp) (op:operator) (v2:exp) : exp = 
@@ -47,34 +46,52 @@ let rec is_value (e:exp) : bool =
   match e with
       Constant _ -> true  
     | Pair (e1, e2) -> is_value e1 && is_value e2
-    | EmptyList -> true
+    | EmptyList _ -> true
     | Cons (e1, e2) -> is_value e1 && is_value e2
     | Closure _ -> true
+    | RecClosure _ -> true
     | _ -> false
       
-let prune_env (env:'a SM.t) (fvars:SS.t) : 'a SM.t =
-  SM.filter (fun v _ -> SS.mem v fvars) env
+let prune_env (env:env) (e:exp) : env =
+  let frees = free_vars e in
+  SM.filter (fun v _ -> SS.mem v frees) env
+
+let prune_tenv (tenv:tenv) (e:exp) : tenv = 
+  let frees = free_tvars e in
+  SM.filter (fun v _ -> SS.mem v frees) tenv
 
 (* substitute for the free variables in t *)
 (* this is virtually identical to Util.sub_in_typ
    maybe something can be factored out *)    
-let eval_typ (tenv:typ SM.t) (t:typ) : typ =
+let sub_all (tenv:tenv) (t:typ) : typ =
   let rec aux t b =
     match t with
-    | BoolTyp | IntTyp | StrTyp -> t
-    | FunTyp (t1,t2) -> FunTyp (aux t1 b, aux t2 b)
-    | PairTyp (t1,t2) -> PairTyp (aux t1 b, aux t2 b)
-    | ListTyp t1 -> ListTyp (aux t1 b)
-    | VarTyp v ->
+    | BoolT | IntT | StrT | VoidT -> t
+    | FunT (t1,t2) -> FunT (aux t1 b, aux t2 b)
+    | PairT (t1,t2) -> PairT (aux t1 b, aux t2 b)
+    | ListT t1 -> ListT (aux t1 b)
+    | VarT v ->
       if SS.mem v b then t else
         (try SM.find v tenv
          with Not_found -> raise (UnboundVariable v))
-    | Forall (v,u) -> Forall (v,aux u b)
+    | ForallT (v,k,u) -> ForallT (v,k,aux u (SS.add v b))
+    | TFunT (v,k,u) -> TFunT (v,k,aux u (SS.add v b))
+    | TAppT (t1,t2) -> TAppT (aux t1 b, aux t2 b)
+    | TRecT (f,v,k1,k2,u) -> TRecT (f,v,k1,k2,
+                                    aux u (SS.add f (SS.add v b)))
+    | TCaseT (alpha,t1,t2,t3,t4,t5,t6) ->
+      TCaseT (aux alpha b,
+              aux t1 b, aux t2 b,
+              aux t3 b, aux t4 b,
+              aux t5 b, aux t6 b)
   in
   aux t SS.empty
 
+let eval_typ tenv t : typ =
+  Util.normalize_type (sub_all tenv t)
+
 (* evaluation; use eval_loop to recursively evaluate subexpressions *)
-let eval_body (env:exp SM.t) (tenv:typ SM.t)
+let eval_body (env:env) (tenv:tenv)
     (eval_loop:exp SM.t -> typ SM.t -> exp -> exp) (e:exp) : exp =
 (*  let bindings = SM.bindings env in
   let tbindings = SM.bindings tenv in*)
@@ -102,29 +119,29 @@ let eval_body (env:exp SM.t) (tenv:typ SM.t)
         (match eval_loop env tenv p with
            Pair(_, second) -> second
          | _ -> raise (BadPair p))
-    | EmptyList -> e
+    | EmptyList _ -> e
     | Cons (e1,e2) ->
         let hd = eval_loop env tenv e1 in
         let tl = eval_loop env tenv e2 in
         (match tl with
-           EmptyList | Cons _ -> Cons (hd,tl)
+           EmptyList _ | Cons _ -> Cons (hd,tl)
          | _ -> raise (BadList tl))
     | Match (e1, e2, x_hd, x_tl, e3) ->
         let v1 = eval_loop env tenv e1 in
         (match v1 with
-           EmptyList -> eval_loop env tenv e2
+           EmptyList _ -> eval_loop env tenv e2
          | Cons (v_hd, v_tl) ->
              let env' = SM.add x_hd v_hd env in
              let env'' = SM.add x_tl v_tl env' in
              eval_loop env'' tenv e3
          | _ -> raise (BadList v1))
-    | Rec (f,arg,body,fvars,ftvars) ->
-       RecClosure (prune_env env fvars,
-		   prune_env tenv ftvars,
+    | Rec (f,arg,_,_,body) ->
+       RecClosure (SM.remove f (SM.remove arg (prune_env env body)),
+		   prune_tenv tenv body,
 		   f,arg,body) 
-    | Fun (arg,body,fvars,ftvars) ->
-       Closure (prune_env env fvars,
-		prune_env tenv ftvars,
+    | Fun (arg,_,body) ->
+       Closure (SM.remove arg (prune_env env body),
+		prune_tenv tenv body,
 	 arg,body)
     | Closure _ | RecClosure _  -> e
     | App (e1,e2) ->
@@ -139,14 +156,15 @@ let eval_body (env:exp SM.t) (tenv:typ SM.t)
 	     let env_cl' = SM.add arg v2 env_cl in
              eval_loop env_cl' tenv_cl body             
          | _ -> raise (BadApplication e))
-    | TypLam (v,e',fvars,ftvars) ->
-        Closure (prune_env env fvars,
-                 prune_env tenv ftvars, v, e')
-    | TypRec (f,arg,body,fvars,ftvars) ->
-      RecClosure (prune_env env fvars,
-                  prune_env tenv ftvars,
+    | TFun (v,_,e') ->
+        Closure (prune_env env e',
+                 SM.remove v (prune_tenv tenv e'),
+                 v, e')
+    | TRec (f,arg,_,_,body) ->
+      RecClosure (SM.remove f (prune_env env body),
+                  SM.remove arg (prune_tenv tenv body),
                   f,arg,body)
-    | TypApp (e',t) ->
+    | TApp (e',t) ->
       let ve' = eval_loop env tenv e' in
       let closed_t = eval_typ tenv t in
        (match ve' with
@@ -158,31 +176,26 @@ let eval_body (env:exp SM.t) (tenv:typ SM.t)
           let env_cl' = SM.add f ve' env_cl in
           eval_loop env_cl' tenv_cl' body
         | _ -> raise (BadApplication e))
-    | Typecase ((v,t),alpha,
+    | TCase (tyop,alpha,
                 eint,ebool,estr,
-                a,b,efun,
-                c,d,epair,
-                f,elist) ->
+                efun,epair,elist) ->
       let closed_alpha = eval_typ tenv alpha in
       (match closed_alpha with
-       | BoolTyp -> eval_loop env tenv ebool
-       | IntTyp -> eval_loop env tenv eint
-       | StrTyp -> eval_loop env tenv estr
-       | FunTyp (t1,t2) ->
-         let new_tenv = SM.add b t2 (SM.add a t1 tenv) in
-         eval_loop env new_tenv efun
-       | PairTyp (t1,t2) ->
-         let new_tenv = SM.add d t2 (SM.add c t1 tenv) in
-         eval_loop env new_tenv epair
-       | ListTyp t' ->
-         let new_tenv = SM.add f t' tenv in
-         eval_loop env new_tenv elist
-       | _ -> raise (BadTypecase e))
+       | BoolT -> eval_loop env tenv ebool
+       | IntT -> eval_loop env tenv eint
+       | StrT -> eval_loop env tenv estr
+       | FunT (t1,t2) ->
+         eval_loop env tenv (TApp (TApp(efun,t1),t2))
+       | PairT (t1,t2) ->
+         eval_loop env tenv (TApp (TApp(epair,t1),t2))
+       | ListT t' ->
+         eval_loop env tenv (TApp (elist,t'))
+       | _ -> raise (BadTCase e))
 ;;
 
 (* evaluate closed, top-level expression e *)
 
-let eval (e:EvalSyntax.exp) =
+let eval (e:exp) =
   let rec loop env tenv e = eval_body env tenv loop e in
   loop SM.empty SM.empty e
 

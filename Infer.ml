@@ -1,25 +1,40 @@
 open Common
-module T = Type
 module TS = TypedSyntax  
 open ParsedSyntax
 
 exception Inference_error ;;
 
+let rec convert_kind (k:kind) : TS.kind =
+  match k with
+  | TypeK -> TS.TypeK
+  | ArrowK (k1,k2) -> TS.ArrowK (convert_kind k1,
+                                 convert_kind k2)
+  | NoneK -> raise Inference_error
 
-
-let rec convert_typ (t:typ) : T.typ =
+let rec convert_typ (t:typ) : TS.typ =
   match t with
-  | BoolTyp -> T.BoolTyp
-  | IntTyp -> T.IntTyp
-  | StrTyp -> T.StrTyp                
-  | FunTyp (t1,t2) -> T.FunTyp (convert_typ t1,
+  | BoolT -> TS.BoolT
+  | IntT -> TS.IntT
+  | StrT -> TS.StrT
+  | VoidT -> TS.VoidT
+  | FunT (t1,t2) -> TS.FunT (convert_typ t1,
 				 convert_typ t2)
-  | PairTyp (t1,t2) -> T.PairTyp (convert_typ t1,
+  | PairT (t1,t2) -> TS.PairT (convert_typ t1,
 				   convert_typ t2)
-  | ListTyp t' -> T.ListTyp (convert_typ t')
-  | Forall (v,t') -> T.Forall (v,(convert_typ t'))
-  | VarTyp x -> T.VarTyp x
-  | NoTyp -> raise Inference_error
+  | ListT t' -> TS.ListT (convert_typ t')
+  | ForallT (v,k,t') -> TS.ForallT (v,convert_kind k,convert_typ t')
+  | VarT x -> TS.VarT x
+  | TFunT (v,k,t') -> TS.TFunT (v,convert_kind k,
+                            convert_typ t')
+  | TRecT (f,v,k1,k2,t') -> TS.TRecT (f,v,convert_kind k1,
+                                      convert_kind k2, convert_typ t')
+  | TAppT (t1,t2) -> TS.TAppT (convert_typ t1,
+                               convert_typ t2)
+  | TCaseT (alpha,t1,t2,t3,t4,t5,t6) ->
+    TS.TCaseT (convert_typ alpha, convert_typ t1, convert_typ t2,
+               convert_typ t3, convert_typ t4, convert_typ t5,
+               convert_typ t6)
+  | NoneT -> raise Inference_error
        
 (* For now, don't do any actual type inference, just convert
 ParsedSyntax to TypedSyntax assuming all type annotations are
@@ -41,22 +56,15 @@ let rec infer (e:exp) : TS.exp =
   | Fun (v,t,e') -> TS.Fun (v,convert_typ t, infer e')
   | Rec (v1,v2,t1,t2,e') -> TS.Rec(v1,v2,convert_typ t1,
 				   convert_typ t2, infer e')
-  | TypLam (v,e') -> TS.TypLam (v,infer e')
-  | TypApp (e',t) -> TS.TypApp (infer e', convert_typ t)
-  | TypRec (v1,v2,t,e) -> TS.TypRec (v1,v2,convert_typ t,infer e)
-  | Typecase (annot,t,
+  | TFun (v,k,e') -> TS.TFun (v,convert_kind k,infer e')
+  | TApp (e',t) -> TS.TApp (infer e', convert_typ t)
+  | TRec (v1,v2,k,t,e) -> TS.TRec (v1,v2,convert_kind k,convert_typ t,infer e)
+  | TCase (annot,t,
               eint,ebool,estr,
-              a,b,efun,
-              c,d,epair,
-              e,elist) ->
-    (match annot with
-     | Some (v,u) ->
-       TS.Typecase ((v,convert_typ u),convert_typ t,
+              efun,epair,elist) ->
+       TS.TCase (convert_typ annot,convert_typ t,
                     infer eint, infer ebool, infer estr,
-                    a,b,infer efun,
-                    c,d,infer epair,
-                    e,infer elist)
-     | None -> raise Inference_error)
+                    infer efun,infer epair,infer elist)
 
 
 	   

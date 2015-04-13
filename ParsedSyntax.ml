@@ -2,21 +2,36 @@ open Core.Std
 include Common
 	  
 
-(* Rather than using a typ option, I add a NoTyp constructor so that
- * the missing type information can be nested, e.g. IntTyp * (NoTyp -> BoolTyp)
+(* Rather than using a typ option, I add a NoneT constructor so that
+ * the missing type information can be nested, e.g. IntT * (NoneT -> BoolT)
 *)
-type typ =       BoolTyp
-	 | IntTyp
-         | StrTyp
-	 | FunTyp of typ * typ
-	 | PairTyp of typ * typ				
-	 | ListTyp of typ
-	 | Forall of variable * typ
-	 | VarTyp of variable
-         | NoTyp
-             deriving (Show)
 
-						      
+type kind =
+  | TypeK | ArrowK of kind * kind
+  | NoneK
+                      deriving (Show)
+
+
+type typ =
+    BoolT
+  | IntT
+  | StrT
+  | VoidT
+  | FunT of typ * typ
+  | PairT of typ * typ				
+  | ListT of typ
+  | ForallT of variable * kind * typ
+  | VarT of variable
+  | TFunT of variable * kind * typ
+  | TRecT of variable * variable * kind * kind * typ
+  | TAppT of typ * typ
+  | TCaseT of typ *
+              typ * typ * typ *
+              typ * typ * typ
+  | NoneT
+      deriving (Show)
+
+
 type exp = 
 
   (* Basic *)
@@ -36,11 +51,9 @@ type exp =
   | Match of exp * exp * variable * variable * exp
 
   (* typecase of [d.d -> string] (list a) of ... *)
-  | Typecase of ((variable*typ) option) * typ *
+  | TCase of typ * typ *
                 exp * exp * exp *
-                variable * variable * exp *
-                variable * variable * exp *
-                variable * exp
+                exp * exp * exp
 
   (* Function *)
   | App of exp * exp
@@ -48,7 +61,7 @@ type exp =
   | Rec of variable * variable * typ * typ * exp
 
   (* Type abstraction/application *)
-  | TypLam of variable * exp
-  | TypRec of variable * variable * typ * exp
-  | TypApp of exp * typ
+  | TFun of variable * kind * exp
+  | TRec of variable * variable * kind * typ * exp
+  | TApp of exp * typ
               deriving (Show)
