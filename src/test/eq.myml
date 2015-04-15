@@ -1,4 +1,4 @@
-(TRec Eq (a::*) :: * =>
+let type Eq = (TRec Eq (a::*) :: * =>
 Typecase a of
 | int => int
 | bool => bool
@@ -7,3 +7,5 @@ Typecase a of
 | s * t => (Eq [s]) * (Eq [t])
 | list s => list (Eq [s])
 end)
+in
+

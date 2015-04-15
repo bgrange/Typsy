@@ -1,10 +1,12 @@
-(fun (x:((TRec f (a::*) :: * =>
+let type t = (TFun (a::*) =>
 Typecase a of
 | int => bool
 | bool => str
 | str => int
-| x -> y => (f x) -> (f y)
-| x * y => (f x) * (f y)
-| list x => list (f x)
+| x -> y => (f [x]) -> (f [y])
+| x * y => (f [x]) * (f [y])
+| list x => list (f [x])
 end)
-(bool -> str))) => x) 
+[int]
+in
+(fun (x:t) => if x then 5 else 10) true

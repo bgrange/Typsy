@@ -157,6 +157,7 @@ let to_kind (k_opt:kind option) : kind =
 %token INT_TYP
 %token STR_TYP
 %token VOID_TYP
+%token TYPE
 %start <ParsedSyntax.exp> parse_exp
 %start <ParsedSyntax.typ> parse_typ
 %%
@@ -185,9 +186,9 @@ type_arg:
         | id = ID;                                   { (id,NoneK) }
         
 typ:
-        | FORALL; var = type_arg; DOT;
-t = typ                       { let (id,k) = var in
-                                ForallT (id, k, t) }
+        | FORALL; var = type_arg; DOT; t = typ
+                                   { let (id,k) = var in
+                                     ForallT (id, k, t) }
         | TFUNT; args = nonempty_list(type_arg); BIG_ARROW; body = typ;
                       { unpack_tfunt args body }
         | TRECT; f = ID; args = nonempty_list(type_arg); ret_kind = option(has_kind);
@@ -250,6 +251,7 @@ exp:
                                                                     { if is_rec
                                                                       then unpack_let_rec f args (to_typ ret_typ) e1 e2
                                                                       else unpack_let f args (to_typ ret_typ) e1 e2 }
+        | LET; TYPE; id = ID; ASSIGN; t = typ; IN; e = exp;              { TLet (id,t,e)  }
         | FUN; args = nonempty_list(arg); BIG_ARROW; body = exp;
                                     { unpack_fun args body }
         | REC; f = ID; args = nonempty_list(arg);

@@ -1,0 +1,3 @@
+let type t = int in
+let f (x:t) : int = x + 1 in
+f 5

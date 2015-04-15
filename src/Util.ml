@@ -1,13 +1,19 @@
 open Common
 open TypedSyntax
 
+module GenVar :
+sig
+  val gen_var : SS.t -> unit -> variable
+end =
+struct
 let next_varid = ref 0 ;;  
 let rec gen_var (avoid:SS.t) () : variable =
   let tvar = "'a" ^ (string_of_int !next_varid) in
   next_varid := !next_varid + 1 ;
   if not (SS.mem tvar avoid) then tvar else gen_var avoid ()
-;;
+end
 
+open GenVar
 
 let rec _free_tvars_in_typ t bound =
   match t with
@@ -112,6 +118,9 @@ let rec sub_in_typ (t:typ) (v:variable) (u:typ) : typ =
               aux t5, aux t6, aux t7)
   in
   aux t
+
+let multi_sub_in_typ (map:tenv) (t:typ) : typ =
+  SM.fold (fun v tv t -> sub_in_typ t v tv) map t
 
 let free_vars (e:exp) : SS.t =
   let rec aux e bound =

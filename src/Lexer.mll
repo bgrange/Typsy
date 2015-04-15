@@ -25,6 +25,7 @@ rule read =
   | "false"  { FALSE }
   | "let"    { LET }
   | "rec"    { REC }
+  | "type"   { TYPE }          
   | "in"     { IN }
   | "typecase" { TCASE }    
   | "of"     { OF }
@@ -68,7 +69,7 @@ rule read =
   | "trec"   { TREC }
   | "TFun"   { TFUNT }
   | "TRec"   { TRECT }
-  | "Typecase"   { TCASET }         
+  | "Typecase"   { TCASET }
   | "fst"    { FST }
   | "snd"    { SND }
   | id       { ID (Lexing.lexeme lexbuf) }
