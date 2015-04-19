@@ -79,11 +79,12 @@ let sub_all (tenv:tenv) (t:typ) : typ =
     | TAppT (t1,t2) -> TAppT (aux t1 b, aux t2 b)
     | TRecT (f,v,k1,k2,u) -> TRecT (f,v,k1,k2,
                                     aux u (SS.add f (SS.add v b)))
-    | TCaseT (alpha,t1,t2,t3,t4,t5,t6) ->
+    | TCaseT (alpha,t1,t2,t3,t4,t5,t6,t7) ->
       TCaseT (aux alpha b,
               aux t1 b, aux t2 b,
               aux t3 b, aux t4 b,
-              aux t5 b, aux t6 b)
+              aux t5 b, aux t6 b,
+              aux t7 b)
   in
   aux t SS.empty
 
@@ -177,13 +178,14 @@ let eval_body (env:env) (tenv:tenv)
           eval_loop env_cl' tenv_cl' body
         | _ -> raise (BadApplication e))
     | TCase (tyop,alpha,
-                eint,ebool,estr,
+                eint,ebool,estr,evoid,
                 efun,epair,elist) ->
       let closed_alpha = eval_typ tenv alpha in
       (match closed_alpha with
        | BoolT -> eval_loop env tenv ebool
        | IntT -> eval_loop env tenv eint
        | StrT -> eval_loop env tenv estr
+       | VoidT -> eval_loop env tenv evoid
        | FunT (t1,t2) ->
          eval_loop env tenv (TApp (TApp(efun,t1),t2))
        | PairT (t1,t2) ->

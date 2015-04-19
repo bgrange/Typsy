@@ -1,7 +1,10 @@
 open Common
 
+exception Closure_error
+
 type kind =
   | TypeK | ArrowK of kind * kind
+  | NoneK
                       deriving (Show)
 
 type typ =
@@ -19,8 +22,9 @@ type typ =
   | TAppT of typ * typ
   | TCaseT of typ *
               typ * typ * typ *
-              typ * typ * typ
-        deriving (Show)
+              typ * typ * typ * typ
+  | NoneT
+      deriving (Show)
 
 type exp = 
   (* Basic *)
@@ -41,7 +45,7 @@ type exp =
              
   | TCase of typ * typ *
                 exp * exp * exp *
-                exp * exp * exp
+                exp * exp * exp * exp
 
   (* Function *)
   | App of exp * exp
@@ -53,8 +57,10 @@ type exp =
   | TRec of variable * variable * kind * typ * exp
   | TApp of exp * typ
 
+  | TLet of variable * typ * exp
               (* Closures *)		       
   | Closure of env * tenv * variable * exp
   | RecClosure of env * tenv * variable * variable * exp
 and env = exp SM.t
 and tenv = typ SM.t
+

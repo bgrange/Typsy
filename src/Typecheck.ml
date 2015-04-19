@@ -56,13 +56,14 @@ let rec kindof_ (ctx : kind SM.t) (t:typ) =
      | ArrowK (k11,k12) ->
        expectk k11 k2;
        k12)
-  | TCaseT (alpha,tint,tbool,tstr,
+  | TCaseT (alpha,tint,tbool,tstr,tvoid,
             tfun,tpair,tlist) ->
     expectk TypeK (kindof_ ctx alpha) ;
     let k = kindof_ ctx tint in
     expectk k (kindof_ ctx tbool) ;
     expectk k (kindof_ ctx tstr) ;
-    
+    expectk k (kindof_ ctx tvoid) ;
+
     let star_k = ArrowK (TypeK,k) in
     let star_star_k = ArrowK (TypeK, star_k) in
     expectk star_star_k (kindof_ ctx tfun) ;
@@ -89,10 +90,10 @@ let rec typ_eq t u =
     let u' = Util.sub_in_typ u' uf (VarT tf) in
     let u' = Util.sub_in_typ u' uv (VarT tv) in
     typ_eq t' u'
-  | TCaseT (alpha,t1,t2,t3,t4,t5,t6), TCaseT (beta,u1,u2,u3,u4,u5,u6) ->
+  | TCaseT (alpha,t1,t2,t3,t4,t5,t6,t7), TCaseT (beta,u1,u2,u3,u4,u5,u6,u7) ->
     List.for_all2 typ_eq
-      [alpha;t1;t2;t3;t4;t5;t6]
-      [beta;t1;t2;t3;t4;t5;t6]
+      [alpha;t1;t2;t3;t4;t5;t6;t7]
+      [beta;u1;u2;u3;u4;u5;u6;u7]
   | VarT v, VarT w -> var_eq v w
   | _ -> false
 
@@ -117,8 +118,8 @@ let rec is_polytype (t:typ) : bool =
   | FunT (t1,t2) | PairT (t1,t2) | TAppT(t1,t2) ->
     is_polytype t1 || is_polytype t2
   | ListT u | TFunT (_,_,u) | TRecT (_,_,_,_,u) -> is_polytype u
-  | TCaseT (alpha,t1,t2,t3,t4,t5,t6) ->
-    List.exists is_polytype [t1;t2;t3;t4;t5;t6]
+  | TCaseT (alpha,t1,t2,t3,t4,t5,t6,t7) ->
+    List.exists is_polytype [t1;t2;t3;t4;t5;t6;t7]
   | ForallT _ -> true
 
 let check_polytype (t:typ) : unit =
@@ -188,7 +189,7 @@ let rec typeof_ (ctx : typ SM.t) (tctx : kind SM.t) (e : exp) : typ =
       | ListT t -> expect hd_typ t ; tl_typ
       | _ -> mismatch' "list" tl_typ)
      
-  | Match (match_on, empty_case, hd_var, tl_var, cons_case) ->
+  | Match (match_on, empty_case, hd_var, tl_var,cons_case) ->
      let match_on_typ = typeof_ ctx tctx match_on in
      (match match_on_typ with
       | ListT t ->
@@ -241,7 +242,7 @@ let rec typeof_ (ctx : typ SM.t) (tctx : kind SM.t) (e : exp) : typ =
       | _ -> mismatch' "universal" e_typ)
 
   | TCase (op,alpha,
-              eint,ebool,estr,
+              eint,ebool,estr,evoid,
               efun,epair,elist) ->
 
     expectk (ArrowK (TypeK, TypeK)) (kindof_ tctx op) ;
@@ -260,7 +261,10 @@ let rec typeof_ (ctx : typ SM.t) (tctx : kind SM.t) (e : exp) : typ =
 
     let tstr = typeof_ ctx tctx estr in
     expect (apply_op StrT) tstr ;
-    
+
+    let tvoid = typeof_ ctx tctx evoid in
+    expect (apply_op VoidT) tvoid ;
+
     let tfun = typeof_ ctx tctx efun in
     expect
       (ForallT ("v1",TypeK,

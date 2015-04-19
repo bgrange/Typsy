@@ -1,3 +1,5 @@
+exception Impossible_error
+
 type variable = string
   deriving (Show)
 

@@ -138,7 +138,7 @@ let rec exp2string prec e =
       | TApp (e',t) -> Printf.sprintf "%s [%s]" (exp2string p e') (string_of_typ t)
       | Closure _ | RecClosure _ -> "<closure>"
       | TCase (tyop,alpha,
-                  eint,ebool,estr,
+                  eint,ebool,estr,evoid,
                   efun,
                   epair,
                   elist) -> "<typecase>"

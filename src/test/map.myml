@@ -1,6 +1,6 @@
-  let map:forall a. forall b. (a -> b) -> list a -> list b =
-    tfun a b => 
-    let mapab (f:a -> b) (l:list a) : list b =
+  let map:forall (a::*) (b::*). (a -> b) -> list a -> list b =
+    tfun (a::*) (b::*) => 
+    let rec mapab (f:a -> b) (l:list a) : list b =
       match l with
       | nil => (nil : list b)
       | hd::tl => (f hd)::(mapab f tl) 

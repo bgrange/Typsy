@@ -4,82 +4,6 @@ open Common
 open Lexing
 open ParsedSyntax
 
-exception Error
-
-let get_fun_typ args ret_typ : typ =
-  List.fold_right
-       (fun (_,t) t_acc -> FunT (t,t_acc))
-       args
-       ret_typ
-
-let get_tfun_typ args ret_typ : typ =
-  List.fold_right
-       (fun (id,k) acc -> ForallT (id,k,acc))
-       args
-       ret_typ
-
-let get_tyop_kind args ret_kind : kind =
-  List.fold_right
-       (fun (_,k) acc -> ArrowK (k,acc))
-       args
-       ret_kind
-
-let rec unpack_fun ids_and_types e : exp =
-  match ids_and_types with
-  | [] -> e
-  | (id,t)::ids' -> Fun (id,t,unpack_fun ids' e)
-
-let rec unpack_tfun ids_and_types e =
-  match ids_and_types with
-  | [] -> e
-  | (id,k)::ids' -> TFun (id,k,unpack_tfun ids' e)
-
-let rec unpack_rec f args ret_typ body =
-  match args with
-  | (a1,a1_typ)::args' ->
-    let f_of_a1_typ = get_fun_typ args' ret_typ in
-    Rec (f,a1,a1_typ,f_of_a1_typ,
-         unpack_fun args' body)
-  | [] -> raise (Failure "expected function argument")
-
-let rec unpack_trec f ids ret_typ body =
-  match ids with
-  | (id1,id1_kind)::ids' ->
-    let f_of_id1_typ = get_tfun_typ ids' ret_typ in
-    TRec (f,id1,id1_kind,
-            f_of_id1_typ,
-            unpack_tfun ids' body)
-  | [] -> raise (Failure "expected function argument")
-
-let rec unpack_tfunt ids_and_kinds t =
-  match ids_and_kinds with
-  | [] -> t
-  | (id,k)::ids' -> TFunT (id,k,unpack_tfunt ids' t)
-
-let rec unpack_trect f ids ret_kind body =
-  match ids with
-  | (id1,id1_kind)::ids' ->
-    let f_of_id1_kind = get_tyop_kind ids' ret_kind in
-    TRecT (f,id1,id1_kind,
-            f_of_id1_kind,
-            unpack_tfunt ids' body)
-  | [] -> raise (Failure "expected function argument")
-
-let unpack_let_rec f args ret_typ e1 e2 : exp =
-  let f_typ = get_fun_typ args ret_typ in
-  let f_to_body = Fun (f,f_typ,e2) in
-  match args with
-  | (a1,a1_typ)::args' ->
-    let f_of_a1_typ = get_fun_typ args' ret_typ in
-    App(f_to_body,
-	Rec (f,a1,a1_typ,f_of_a1_typ,unpack_fun args' e1))
-  | [] -> raise (Failure "expected function argument")
-
-let unpack_let f args ret_typ e1 e2 : exp =
-  let f_typ = get_fun_typ args ret_typ in
-  let f_to_body = Fun (f,f_typ,e2) in
-  App (f_to_body, unpack_fun args e1)
-
 let to_typ (t_opt:typ option) : typ =
   match t_opt with
   | None -> NoneT
@@ -186,31 +110,14 @@ type_arg:
         | id = ID;                                   { (id,NoneK) }
         
 typ:
-        | FORALL; var = type_arg; DOT; t = typ
-                                   { let (id,k) = var in
-                                     ForallT (id, k, t) }
+        | FORALL; vars = nonempty_list(type_arg); DOT; t = typ
+                                   { ForallT (vars, t) }
         | TFUNT; args = nonempty_list(type_arg); BIG_ARROW; body = typ;
-                      { unpack_tfunt args body }
+                      { TFunT (args,body) }
         | TRECT; f = ID; args = nonempty_list(type_arg); ret_kind = option(has_kind);
-                   BIG_ARROW; body = typ;         { unpack_trect f args (to_kind ret_kind) body }
+                   BIG_ARROW; body = typ;         { TRecT (f, args, (to_kind ret_kind),body) }
         | TCASET; alpha = typ; OF; option(VERT_BAR);
-          matches = separated_list(VERT_BAR,separated_pair(typ,BIG_ARROW,typ)); END
-                                   { match matches with
-                                     | [(IntT,tint);
-                                        (BoolT,tbool);
-                                        (StrT,tstr);
-                                        (FunT(VarT a, VarT b),tfun);
-                                        (PairT(VarT c, VarT d),tpair);
-                                        (ListT(VarT f), tlist)] -> TCaseT (alpha,
-                                                                             tint,tbool,tstr,
-                                                                             TFunT (a,TypeK,
-                                                                                     TFunT (b,TypeK,
-                                                                                              tfun)),
-                                                                             TFunT (c,TypeK,
-                                                                                     TFunT (d,TypeK,
-                                                                                             tpair)),
-                                                                             TFunT (f,TypeK,tlist))
-                                     | _ -> raise Error }
+          matches = separated_list(VERT_BAR,separated_pair(typ,BIG_ARROW,typ)); END { TCaseT (alpha,matches)  }
         | t = typ1                      { t }
         ;
 typ1:
@@ -246,21 +153,24 @@ tcase_annot:
    | LBRACK; t = typ; RBRACK           { t }
 
 exp:
-        | LET; is_rec = boption(REC); f = ID; args = list(arg);
-          ret_typ = option(has_typ); ASSIGN; e1 = exp; IN; e2 = exp
-                                                                    { if is_rec
-                                                                      then unpack_let_rec f args (to_typ ret_typ) e1 e2
-                                                                      else unpack_let f args (to_typ ret_typ) e1 e2 }
-        | LET; TYPE; id = ID; ASSIGN; t = typ; IN; e = exp;              { TLet (id,t,e)  }
+        | LET; REC; f = ID; args = list(arg);
+                ret_typ = option(has_typ); ASSIGN; e1 = exp; IN; e2 = exp { LetRec (f,args,to_typ ret_typ,e1,e2) }
+        | LET; f = ID; args = list(arg); ret_typ = option(has_typ); ASSIGN; e1 = exp; IN; e2 = exp
+                                                                          { Let (f,args,to_typ ret_typ,e1,e2) }
+        | LET; TYPE; REC; f = ID; args = list(type_arg);
+                ret_kind = option(has_kind); ASSIGN; t = typ; IN; e = exp { TLetRec (f,args,to_kind ret_kind,t,e) }
+        | LET; TYPE; f = ID; args = list(type_arg);
+                ASSIGN; t = typ; IN; e = exp { TLet (f,args,t,e) }
+
         | FUN; args = nonempty_list(arg); BIG_ARROW; body = exp;
-                                    { unpack_fun args body }
+                                    { Fun (args,body) }
         | REC; f = ID; args = nonempty_list(arg);
           ret_typ = option(has_typ); BIG_ARROW; body = exp; 
-                                    { unpack_rec f args (to_typ ret_typ) body }
+                                    { Rec (f,args,to_typ ret_typ, body) }
         | TFUN; args = nonempty_list(type_arg); BIG_ARROW; body = exp;
-                      { unpack_tfun args body }
+                      { TFun (args,body) }
         | TREC; f = ID; args = nonempty_list(type_arg); ret_typ = option(has_typ);
-                    BIG_ARROW; body = exp;         { unpack_trec f args (to_typ ret_typ) body }
+                    BIG_ARROW; body = exp;         { TRec (f,args,to_typ ret_typ,body) }
         | IF; cond = exp;
                 THEN; then_exp = exp;
                 ELSE; else_exp = exp;
@@ -274,22 +184,7 @@ exp:
                                         { EmptyList (to_typ t) }
         | TCASE; annot = option(tcase_annot); t = typ; OF; option(VERT_BAR);
           matches = separated_list(VERT_BAR,separated_pair(typ,BIG_ARROW,exp)); END
-                                   { match matches with
-                                     | [(IntT,eint);
-                                        (BoolT,ebool);
-                                        (StrT,estr);
-                                        (FunT(VarT a, VarT b),efun);
-                                        (PairT(VarT c, VarT d),epair);
-                                        (ListT(VarT f), elist)] -> TCase (to_typ annot,t,
-                                                                             eint,ebool,estr,
-                                                                             TFun (a,TypeK,
-                                                                                     TFun (b,TypeK,
-                                                                                              efun)),
-                                                                             TFun (c,TypeK,
-                                                                                     TFun (d,TypeK,
-                                                                                             epair)),
-                                                                             TFun (f,TypeK,elist))
-                                     | _ -> raise Error }
+                                   { TCase (to_typ annot,t,matches)  }
 
         | e = exp2                            { e }
     

@@ -41,9 +41,10 @@ let parse_typ filename : ParsedSyntax.typ =
 
 let eval_file filename =
   let parsed = parse_exp filename in
-  let typed = Convert.transform_convert parsed in
-  let _ = Typecheck.typeof typed in
-  let evald = Eval.eval typed in
+  let exp = Convert.convert parsed in
+  let typed_exp = Infer.infer exp in
+  let _ = Typecheck.typeof typed_exp in
+  let evald = Eval.eval typed_exp in
   print_endline ("eval'd expression:\n" ^ (Pretty.string_of_exp evald)) ;
   evald
   
@@ -52,7 +53,8 @@ let eval_file filename =
 let debug_eval_file filename =
   let parsed_exp = parse_exp filename in
   print_endline ("parsed expression:\n" ^ (Show.show<ParsedSyntax.exp> parsed_exp)) ;
-  let typed_exp = Convert.transform_convert parsed_exp in
+  let exp = Convert.convert parsed_exp in
+  let typed_exp = Infer.infer exp in
   print_endline ("typed expression:\n" ^ (Pretty.string_of_exp typed_exp)) ;
   let _ = Typecheck.typeof typed_exp in
   let value = Eval.eval typed_exp in
