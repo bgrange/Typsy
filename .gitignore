@@ -12,3 +12,7 @@
 *~
 
 src/_build/
+report/auto/
+
+*.fls
+*.fdb_latexmk
