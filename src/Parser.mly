@@ -23,7 +23,6 @@ let to_kind (k_opt:kind option) : kind =
 %token FALSE
 %token LET
 %token REC
-%token TREC
 %token IN
 %token ASSIGN
 %token DOUBLE_COLON
@@ -64,13 +63,12 @@ let to_kind (k_opt:kind option) : kind =
 %left OR
 %left AND
 %token FUN
-%token TFUN
 %token TFUNT
-%token TRECT
 %token TCASE
-%token TCASET
+%token TRECT
 %token OF
 %token <string> ID
+%token <string> TYP_ID
 %token COMMA
 %right COMMA
 %token FST
@@ -105,19 +103,20 @@ has_kind:
         | DOUBLE_COLON; k = kind             { k }
         ;
 
+type_param:
+        | LPAREN; id = TYP_ID; k = has_kind; RPAREN    { (id,k) }
+        | id = TYP_ID;  { (id,NoneK) }
+
 type_arg:
-        | LPAREN; id = ID; k = has_kind; RPAREN    { (id,k) }
-        | id = ID;                                   { (id,NoneK) }
+        | LBRACK; t_opt = option(typ); RBRACK { to_typ t_opt }
         
 typ:
-        | FORALL; vars = nonempty_list(type_arg); DOT; t = typ
+        | FORALL; vars = nonempty_list(type_param); DOT; t = typ
                                    { ForallT (vars, t) }
-        | TFUNT; args = nonempty_list(type_arg); BIG_ARROW; body = typ;
-                      { TFunT (args,body) }
-        | TRECT; f = ID; args = nonempty_list(type_arg); ret_kind = option(has_kind);
-                   BIG_ARROW; body = typ;         { TRecT (f, args, (to_kind ret_kind),body) }
-        | TCASET; alpha = typ; OF; option(VERT_BAR);
-          matches = separated_list(VERT_BAR,separated_pair(typ,BIG_ARROW,typ)); END { TCaseT (alpha,matches)  }
+        | TFUNT; params = nonempty_list(type_param); BIG_ARROW; body = typ;
+                      { TFunT (params,body) }
+        | TRECT;  name= TYP_ID; alpha = type_arg; k = has_kind; OF; option(VERT_BAR);
+          matches = separated_list(VERT_BAR,separated_pair(typ,BIG_ARROW,typ)); END { TRecT (name,alpha,k,matches) }
         | t = typ1                      { t }
         ;
 typ1:
@@ -127,7 +126,7 @@ typ1:
         ;
 
 typ2:
-        | t1 = typ2; LBRACK; t2 = typ3; RBRACK     { TAppT(t1,t2) }
+        | t1 = typ2; t2 = type_arg     { TAppT(t1,t2) }
         | LIST_TYP; t = typ3           { ListT t }         
         | t = typ3        { t }
         
@@ -137,40 +136,37 @@ typ3:
         | INT_TYP                       { IntT }
         | STR_TYP                       { StrT }
         | VOID_TYP                          { VoidT }
-        | var = ID                      { VarT var }
+        | var = TYP_ID                      { VarT var }
         ;
 
 has_typ:
         | COLON; t = typ             { t }
         ;
 
-arg:
+exp_param:
         | LPAREN; id = ID; t = has_typ; RPAREN    { (id,t) }
         | id = ID;                                   { (id,NoneT) }
+                                                                                   
+param:
+        | idt = exp_param;        { let (id,t) = idt in 
+                                        (id,T t) }
+        | idk = type_param;        { let (id,k) = idk in
+                                       (id,K k) }
+
                                                                                       
-
-tcase_annot:
-   | LBRACK; t = typ; RBRACK           { t }
-
 exp:
-        | LET; REC; f = ID; args = list(arg);
-                ret_typ = option(has_typ); ASSIGN; e1 = exp; IN; e2 = exp { LetRec (f,args,to_typ ret_typ,e1,e2) }
-        | LET; f = ID; args = list(arg); ret_typ = option(has_typ); ASSIGN; e1 = exp; IN; e2 = exp
-                                                                          { Let (f,args,to_typ ret_typ,e1,e2) }
-        | LET; TYPE; REC; f = ID; args = list(type_arg);
-                ret_kind = option(has_kind); ASSIGN; t = typ; IN; e = exp { TLetRec (f,args,to_kind ret_kind,t,e) }
-        | LET; TYPE; f = ID; args = list(type_arg);
-                ASSIGN; t = typ; IN; e = exp { TLet (f,args,t,e) }
+        | LET; REC; f = ID; params = list(param);
+                ret_typ = option(has_typ); ASSIGN; e1 = exp; IN; e2 = exp { LetRec (f,params,to_typ ret_typ,e1,e2) }
+        | LET; f = ID; params = list(param); ret_typ = option(has_typ); ASSIGN; e1 = exp; IN; e2 = exp
+                                                                          { Let (f,params,to_typ ret_typ,e1,e2) }
+        | LET; TYPE; f = TYP_ID; params = list(type_param);
+                ASSIGN; t = typ; IN; e = exp { TLet (f,params,t,e) }
 
-        | FUN; args = nonempty_list(arg); BIG_ARROW; body = exp;
-                                    { Fun (args,body) }
-        | REC; f = ID; args = nonempty_list(arg);
+        | FUN; params = nonempty_list(param); BIG_ARROW; body = exp;
+                                    { Fun (params,body) }
+        | REC; FUN; f = ID; params = nonempty_list(param);
           ret_typ = option(has_typ); BIG_ARROW; body = exp; 
-                                    { Rec (f,args,to_typ ret_typ, body) }
-        | TFUN; args = nonempty_list(type_arg); BIG_ARROW; body = exp;
-                      { TFun (args,body) }
-        | TREC; f = ID; args = nonempty_list(type_arg); ret_typ = option(has_typ);
-                    BIG_ARROW; body = exp;         { TRec (f,args,to_typ ret_typ,body) }
+                                    { Rec (f,params,to_typ ret_typ, body) }
         | IF; cond = exp;
                 THEN; then_exp = exp;
                 ELSE; else_exp = exp;
@@ -182,9 +178,9 @@ exp:
           BIG_ARROW; e3 = exp; END              { Match (e1,e2,hd,tl,e3) }
         | NIL; t = option(has_typ);                          
                                         { EmptyList (to_typ t) }
-        | TCASE; annot = option(tcase_annot); t = typ; OF; option(VERT_BAR);
+        | TCASE; annot = type_arg; t = typ; OF; option(VERT_BAR);
           matches = separated_list(VERT_BAR,separated_pair(typ,BIG_ARROW,exp)); END
-                                   { TCase (to_typ annot,t,matches)  }
+                                   { TCase (annot,t,matches)  }
 
         | e = exp2                            { e }
     
@@ -209,8 +205,8 @@ exp2:
 
 exp3:
         | f = exp3; args = exp4;         { App (f,args) }
-        | e = exp3; LBRACK; t = option(typ); RBRACK
-                                        { TApp (e,to_typ t) }
+        | e = exp3; t = type_arg
+                                        { TApp (e,t) }
         | FST; e = exp4                  { Fst e }
         | SND; e = exp4                  { Snd e }
         | e = exp4                      { e }

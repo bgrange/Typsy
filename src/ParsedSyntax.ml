@@ -23,11 +23,13 @@ type typ =
   | ForallT of (variable * kind) list * typ
   | VarT of variable
   | TFunT of (variable * kind) list * typ
-  | TRecT of variable * (variable * kind) list * kind * typ
   | TAppT of typ * typ
-  | TCaseT of typ * (typ * typ) list
+  | TRecT of variable * typ * kind * (typ * typ) list
   | NoneT
       deriving (Show)
+
+type typorkind = T of typ | K of kind
+                   deriving (Show)
 
 type exp = 
 
@@ -52,17 +54,15 @@ type exp =
             
   (* Function *)
   | App of exp * exp
-  | Fun of (variable * typ) list * exp		   
-  | Rec of variable * (variable * typ) list * typ * exp
+  | Fun of (variable * typorkind) list * exp		   
+  | Rec of variable * (variable * typorkind) list * typ * exp
            
-  | Let of variable * (variable * typ) list * typ * exp * exp
-  | LetRec of variable * (variable * typ) list * typ * exp * exp
+  | Let of variable * (variable * typorkind) list * typ * exp * exp
+  | LetRec of variable * (variable * typorkind) list * typ * exp * exp
   | TLet of variable * (variable * kind) list * typ * exp
-  | TLetRec of variable * (variable * kind) list * kind * typ * exp
-
 
   (* Type abstraction/application *)
-  | TFun of (variable * kind) list * exp
-  | TRec of variable * (variable * kind) list * typ * exp
+(*  | TFun of (variable * kind) list * exp
+    | TRec of variable * (variable * kind) list * typ * exp *)
   | TApp of exp * typ
               deriving (Show)

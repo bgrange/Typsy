@@ -3,7 +3,7 @@ open Lexing
 open Parser
 
 open Common
-open TypedSyntax
+open Syntax
 
 exception SyntaxError of string
 

@@ -1,4 +1,4 @@
-open TypedSyntax
+open Syntax
 open Common
 
 let string_of_const c = 
@@ -35,6 +35,7 @@ let rec string_of_typ typ =
   | BoolT -> "bool"
   | IntT -> "int"
   | StrT -> "str"
+  | VoidT -> "void"
   | FunT (a,b) -> Printf.sprintf "(%s -> %s)" (string_of_typ a) (string_of_typ b)
   | PairT (a,b) -> Printf.sprintf "(%s * %s)" (string_of_typ a) (string_of_typ b)
   | ListT a -> Printf.sprintf "list %s" (string_of_typ a)
@@ -50,12 +51,8 @@ let rec string_of_typ typ =
   | TFunT (v,k,t) -> Printf.sprintf
                      "(Tfun %s::%s => %s)"
                      v (string_of_kind k) (string_of_typ t)
-  | TRecT (f,v,k1,k2,t) -> Printf.sprintf
-                              "(Trec %s (%s::%s) :: %s => %s)"
-                              f v (string_of_kind k1)
-                              (string_of_kind k2)
-                              (string_of_typ t)
-  | TCaseT _ -> "<Typecase>"
+
+  | TRecT _ -> "<Typecase>"
 
 (* Printing functions *)		      
 		      

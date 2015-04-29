@@ -1,16 +1,16 @@
 open Common
-module TS = TypedSyntax  
+module Syn = Syntax  
 open ParsedSyntax
 open Util.GenVar
 
 exception Conversion_error of string ;;
 
-let rec convert_kind (k:kind) : TS.kind =
+let rec convert_kind (k:kind) : Syn.kind =
   match k with
-  | TypeK -> TS.TypeK
-  | ArrowK (k1,k2) -> TS.ArrowK (convert_kind k1,
+  | TypeK -> Syn.TypeK
+  | ArrowK (k1,k2) -> Syn.ArrowK (convert_kind k1,
                                  convert_kind k2)
-  | NoneK -> TS.NoneK
+  | NoneK -> Syn.NoneK
 
 let get_tyop_kind args ret_kind =
   List.fold_right
@@ -18,47 +18,37 @@ let get_tyop_kind args ret_kind =
        args
        ret_kind
 
-let rec convert_typ (t:typ) : TS.typ =
+let rec convert_typ (t:typ) : Syn.typ =
   match t with
-  | BoolT -> TS.BoolT
-  | IntT -> TS.IntT
-  | StrT -> TS.StrT
-  | VoidT -> TS.VoidT
-  | FunT (t1,t2) -> TS.FunT (convert_typ t1,
+  | BoolT -> Syn.BoolT
+  | IntT -> Syn.IntT
+  | StrT -> Syn.StrT
+  | VoidT -> Syn.VoidT
+  | FunT (t1,t2) -> Syn.FunT (convert_typ t1,
 				 convert_typ t2)
-  | PairT (t1,t2) -> TS.PairT (convert_typ t1,
+  | PairT (t1,t2) -> Syn.PairT (convert_typ t1,
 				   convert_typ t2)
-  | ListT t' -> TS.ListT (convert_typ t')
+  | ListT t' -> Syn.ListT (convert_typ t')
   | ForallT (args,t') -> convert_forallt args t'
-  | VarT x -> TS.VarT x
+  | VarT x -> Syn.VarT x
   | TFunT (args,t') -> convert_tfunt args t'
-  | TRecT (f,args,k,t') -> convert_trect f args k t'
-  | TAppT (t1,t2) -> TS.TAppT (convert_typ t1,
+  | TAppT (t1,t2) -> Syn.TAppT (convert_typ t1,
                                convert_typ t2)
-  | TCaseT (alpha,cases) -> convert_tcaset alpha cases
-  | NoneT -> TS.NoneT
+  | TRecT (name,alpha,k,cases) -> convert_trect name alpha k cases
+  | NoneT -> Syn.NoneT
 and convert_forallt ids_and_kinds t =
   match ids_and_kinds with
   | [] -> convert_typ t
-  | (id,k)::ids' -> TS.ForallT (id,
+  | (id,k)::ids' -> Syn.ForallT (id,
                                 convert_kind k,
                                 convert_forallt ids' t)
 and convert_tfunt ids_and_kinds t =
   match ids_and_kinds with
   | [] -> convert_typ t
-  | (id,k)::ids' -> TS.TFunT (id,
+  | (id,k)::ids' -> Syn.TFunT (id,
                               convert_kind k,
                               convert_tfunt ids' t)
-
-and convert_trect f ids ret_kind body =
-  match ids with
-  | (id1,id1_kind)::ids' ->
-    let f_of_id1_kind = get_tyop_kind ids' ret_kind in
-    TS.TRecT (f,id1,convert_kind id1_kind,
-              convert_kind f_of_id1_kind,
-              convert_tfunt ids' body)
-  | [] -> raise (Conversion_error "expected function argument")
-and convert_tcaset alpha cases =
+and convert_trect name alpha k cases =
   match cases with
   | [(IntT,tint);
      (BoolT,tbool);
@@ -66,106 +56,118 @@ and convert_tcaset alpha cases =
      (VoidT,tvoid);
      (FunT(VarT a, VarT b),tfun);
      (PairT(VarT c, VarT d),tpair);
-     (ListT(VarT f), tlist)] -> TS.TCaseT (convert_typ alpha,
-                                           convert_typ tint,
-                                           convert_typ tbool,
-                                           convert_typ tstr,
-                                           convert_typ tvoid,
-                                           TS.TFunT (a,TS.TypeK,
-                                                     TS.TFunT (b,TS.TypeK,
-                                                               convert_typ tfun)),
-                                           TS.TFunT (c,TS.TypeK,
-                                                     TS.TFunT (d,TS.TypeK,
-                                                               convert_typ tpair)),
-                                           TS.TFunT (f,TS.TypeK,
-                                                     convert_typ tlist))
+     (ListT(VarT f), tlist)] ->
+    let tfun = convert_typ tfun in
+    let tfunAvoid = SS.add a (SS.add b (Util.free_tvars_in_typ tfun)) in
+    let tfunV1 = gen_var tfunAvoid () in
+    let tfunV2 = gen_var tfunAvoid () in
+    let tfun = Util.replace_typ tfun (Syn.TAppT (Syn.VarT name, Syn.VarT a)) (Syn.VarT tfunV1) in
+    let tfun = Util.replace_typ tfun (Syn.TAppT (Syn.VarT name, Syn.VarT b)) (Syn.VarT tfunV2) in
+
+    let tpair = convert_typ tpair in    
+    let tpairAvoid = SS.add a (SS.add b (Util.free_tvars_in_typ tpair)) in
+    let tpairV1 = gen_var tpairAvoid () in
+    let tpairV2 = gen_var tpairAvoid () in
+    let tpair = Util.replace_typ tpair (Syn.TAppT (Syn.VarT name, Syn.VarT c)) (Syn.VarT tpairV1) in
+    let tpair = Util.replace_typ tpair (Syn.TAppT (Syn.VarT name, Syn.VarT d)) (Syn.VarT tpairV2) in
+
+    let tlist = convert_typ tlist in
+    let tlistAvoid = SS.add f (Util.free_tvars_in_typ tlist) in
+    let tlistV = gen_var tlistAvoid () in
+    let tlist = Util.replace_typ tlist (Syn.TAppT (Syn.VarT name, Syn.VarT f)) (Syn.VarT tlistV) in
+
+    let k = convert_kind k in
+    Syn.TRecT (convert_typ alpha,
+              convert_typ tint,
+              convert_typ tbool,
+              convert_typ tstr,
+              convert_typ tvoid,
+              Syn.TFunT (a,Syn.TypeK,
+                        Syn.TFunT (b,Syn.TypeK,
+                                  Syn.TFunT (tfunV1,k,
+                                            Syn.TFunT (tfunV2,k,
+                                                      tfun)))),
+              Syn.TFunT (c,Syn.TypeK,
+                        Syn.TFunT (d,Syn.TypeK,
+                                  Syn.TFunT (tpairV1,k,
+                                            Syn.TFunT (tpairV2,k,
+                                                      tpair)))),
+              Syn.TFunT (f,Syn.TypeK,Syn.TFunT (tlistV,k,tlist)))
   | _ -> raise (Conversion_error "malformed Typecase")
+
 
 let get_fun_typ args ret_typ =
   List.fold_right
-       (fun (_,t) t_acc -> FunT (t,t_acc))
-       args
-       ret_typ
+    (fun (id,tk) t_acc ->
+       match tk with
+       | T t -> FunT (t,t_acc)
+       | K k -> ForallT ([(id,k)],t_acc))
+    args
+    ret_typ
 
-let get_tfun_typ args ret_typ =
-  ForallT (args,ret_typ)
-
-let rec convert (e:exp) : TS.exp =
+let rec convert (e:exp) : Syn.exp =
   match e with
-  | Var v -> TS.Var v   
-  | Constant c -> TS.Constant c
-  | Op (e1,op,e2) -> TS.Op (convert e1,op,convert e2)
-  | If (e1,e2,e3) -> TS.If (convert e1,convert e2,convert e3)
-  | Pair (e1,e2) -> TS.Pair (convert e1,convert e2)
-  | Fst e' -> TS.Fst (convert e')
-  | Snd e' -> TS.Snd (convert e')
-  | EmptyList t -> TS.EmptyList (convert_typ t)
-  | Cons (e1,e2) -> TS.Cons (convert e1, convert e2)
-  | Match (e1,e2,v1,v2,e3) -> TS.Match (convert e1, convert e2,
+  | Var v -> Syn.Var v   
+  | Constant c -> Syn.Constant c
+  | Op (e1,op,e2) -> Syn.Op (convert e1,op,convert e2)
+  | If (e1,e2,e3) -> Syn.If (convert e1,convert e2,convert e3)
+  | Pair (e1,e2) -> Syn.Pair (convert e1,convert e2)
+  | Fst e' -> Syn.Fst (convert e')
+  | Snd e' -> Syn.Snd (convert e')
+  | EmptyList t -> Syn.EmptyList (convert_typ t)
+  | Cons (e1,e2) -> Syn.Cons (convert e1, convert e2)
+  | Match (e1,e2,v1,v2,e3) -> Syn.Match (convert e1, convert e2,
 					v1,v2, convert e3)
-  | App (e1,e2) -> TS.App (convert e1,convert e2)
+  | App (e1,e2) -> Syn.App (convert e1,convert e2)
   | Fun (args,e') -> convert_fun args e'
   | Rec (f,args,t,e') -> convert_rec f args t e'
-  | TFun (args,e') -> convert_tfun args e'
-  | TApp (e',t) -> TS.TApp (convert e', convert_typ t)
-  | TRec (f,args,t,e) -> convert_trec f args t e
+  | TApp (e',t) -> Syn.TApp (convert e', convert_typ t)
 
   | Let (v,args,t,e1,e2) -> convert_let v args t e1 e2
   | LetRec (v,args,t,e1,e2) -> convert_letrec v args t e1 e2
   | TLet (v,args,t,e') -> convert_tlet v args t e'
-  | TLetRec (v,args,k,t,e') -> convert_tletrec v args k t e'
   | TCase (t,alpha,cases) -> convert_tcase t alpha cases
 and convert_fun ids_and_types e =
   match ids_and_types with
   | [] -> convert e
-  | (id,t)::ids' -> TS.Fun (id,
+  | (id,T t)::ids' -> Syn.Fun (id,
                          convert_typ t,
-                         convert_fun ids' e)
-
-and convert_tfun ids_and_types e =
-  match ids_and_types with
-  | [] -> convert e
-  | (id,k)::ids' -> TS.TFun (id,
-                          convert_kind k,
-                          convert_tfun ids' e)
+                              convert_fun ids' e)
+  | (id,K k)::ids' -> Syn.TFun (id,
+                               convert_kind k,
+                               convert_fun ids' e)
 
 and convert_rec f args ret_typ body =
   match args with
-  | (a1,a1_typ)::args' ->
+  | (a1,T a1_typ)::args' ->
     let f_of_a1_typ = get_fun_typ args' ret_typ in
-    TS.Rec (f,a1,
+    Syn.Rec (f,a1,
             convert_typ a1_typ,
             convert_typ f_of_a1_typ,
             convert_fun args' body)
-  | [] -> raise (Conversion_error "expected function argument")
-
-and convert_trec f ids ret_typ body =
-  match ids with
-  | (id1,id1_kind)::ids' ->
-    let f_of_id1_typ = get_tfun_typ ids' ret_typ in
-    TS.TRec (f,id1,
-             convert_kind id1_kind,
-             convert_typ f_of_id1_typ,
-             convert_tfun ids' body)
+  | (a1,K a1_kind)::args' ->
+    let f_of_a1_typ = get_fun_typ args' ret_typ in
+    Syn.TRec (f,a1,
+             convert_kind a1_kind,
+             convert_typ f_of_a1_typ,
+             convert_fun args' body)
+  
   | [] -> raise (Conversion_error "expected function argument")
 
 and convert_letrec f args ret_typ e1 e2 =
   let f_typ = get_fun_typ args ret_typ in
-  let f_to_body = Fun ([(f,f_typ)],e2) in
+  let f_to_body = Fun ([(f,T f_typ)],e2) in
   convert (App (f_to_body, Rec (f,args,ret_typ,e1)))
 
 and convert_let f args ret_typ e1 e2 =
   let f_typ = get_fun_typ args ret_typ in
-  let f_to_body = Fun ([(f,f_typ)],e2) in
+  let f_to_body = Fun ([(f,T f_typ)],e2) in
   convert (App (f_to_body, Fun (args,e1)))
 
-and convert_tlet v args t e' =
-  TS.TLet (v,convert_tfunt args t,
-           convert e')
-
-and convert_tletrec f args k t e' =
-  TS.TLet (f,convert_trect f args k t,
-           convert e')
+and convert_tlet v args t e =
+  let vdef = convert_tfunt args t in
+  let e = convert e in
+  Util.sub_typ_in_exp e v vdef
 
 and convert_tcase t alpha cases =
   match cases with
@@ -175,14 +177,14 @@ and convert_tcase t alpha cases =
      (VoidT,evoid);
      (FunT(VarT a, VarT b),efun);
      (PairT(VarT c, VarT d),epair);
-     (ListT(VarT f), elist)] -> TS.TCase (convert_typ t, convert_typ alpha,
+     (ListT(VarT f), elist)] -> Syn.TCase (convert_typ t, convert_typ alpha,
                                           convert eint,convert ebool,
                                           convert estr,convert evoid,
-                                          TS.TFun (a,TS.TypeK,
-                                                   TS.TFun (b,TS.TypeK,
+                                          Syn.TFun (a,Syn.TypeK,
+                                                   Syn.TFun (b,Syn.TypeK,
                                                             convert efun)),
-                                          TS.TFun (c,TS.TypeK,
-                                                   TS.TFun (d,TS.TypeK,
+                                          Syn.TFun (c,Syn.TypeK,
+                                                   Syn.TFun (d,Syn.TypeK,
                                                             convert epair)),
-                                          TS.TFun (f,TS.TypeK,convert elist))
+                                          Syn.TFun (f,Syn.TypeK,convert elist))
   | _ -> raise (Conversion_error "malformed typecase")

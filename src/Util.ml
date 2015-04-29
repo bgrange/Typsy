@@ -1,5 +1,5 @@
 open Common
-open TypedSyntax
+open Syntax
 
 module GenVar :
 sig
@@ -30,11 +30,10 @@ let transformt
       | ListT a -> ListT (aux s' a)
       | ForallT (v,k,a) -> ForallT (v,k,aux s' a)
       | TFunT (v,k,a) -> TFunT (v,k,aux s' a)
-      | TRecT (f,v,k1,k2,a) -> TRecT (f,v,k1,k2,aux s' a)
       | TAppT (a,b) -> TAppT (aux s' a, aux s' b)
-      | TCaseT (alpha,
+      | TRecT (alpha,
                 t1,t2,t3,t4,t5,t6,t7) ->
-        TCaseT (aux s' alpha,
+        TRecT (aux s' alpha,
                 aux s' t1, aux s' t2, aux s' t3,
                 aux s' t4, aux s' t5, aux s' t6, aux s' t7)
 
@@ -64,11 +63,8 @@ let foldt
                                aux s' a]
          | TFunT (_,k,a) -> [inject_k s k;
                              aux s' a]
-         | TRecT (_,_,k1,k2,a) -> [inject_k s k1;
-                                   inject_k s k2;
-                                   aux s' a]
          | TAppT (a,b) -> [aux s' a; aux s' b]
-         | TCaseT (alpha,
+         | TRecT (alpha,
                    t1,t2,t3,t4,t5,t6,t7) ->
            [aux s' alpha;
             aux s' t1; aux s' t2; aux s' t3;
@@ -112,9 +108,8 @@ let transform
                                    g s t2,
                                    aux s' e1)
       | TFun (v,k,e1) -> TFun (v,k,aux s' e1)
-      | TRec (f,v,k,t,e1) -> TRec (f,v,k,g s t,aux s' e1)
+      | TRec (f,v,k,t,e1) -> TRec (f,v,k,g s t,aux s' e1)                           
       | TApp (e1,t) -> TApp (aux s' e1, g s t)
-      | TLet (v,t,e1) -> TLet (v,g s t,aux s' e1)
       | Closure _ | RecClosure _ -> raise Closure_error
     in
     f s e'
@@ -156,9 +151,8 @@ let fold
                                   inject_t s t2;
                                   aux s' e1]
          | TFun (v,k,e1) -> [inject_k s k;aux s' e1]
-         | TRec (f,v,k,t,e1) -> [inject_k s k;inject_t s t;aux s' e1]
+         | TRec (f,v,k,t,e1) -> [inject_k s k;inject_t s t;aux s' e1]                            
          | TApp (e1,t) -> [aux s' e1; inject_t s t]
-         | TLet (v,t,e1) -> [inject_t s t;aux s' e1]
          | Closure _ | RecClosure _ -> raise Closure_error
          | _ -> raise Impossible_error)
 
@@ -179,7 +173,6 @@ let _free_tvars_in_typ bound t : SS.t =
     (fun b t ->
        match t with
        | ForallT (v,_,_) | TFunT (v,_,_) -> SS.add v b
-       | TRecT (f,v,_,_,_) -> SS.add f (SS.add v b)
        | _ -> b)
     bound
     t  
@@ -198,7 +191,7 @@ let free_tvars (e:exp) : SS.t =
     (fun s e ->
        match e with
        | TFun (v,_,_) -> SS.add v s
-       | TRec (f,v,_,_,_) -> SS.add f (SS.add v s)
+       | TRec (f,v,_,_,_) -> SS.add f (SS.add v s)                           
        | _ -> s)
     SS.empty
     e
@@ -233,28 +226,29 @@ let rec sub_in_typ (t:typ) (v:variable) (u:typ) : typ =
 	TFunT (w, k,aux t'_renamed)
       else
 	TFunT (v',k,aux t')
-    | TRecT (f,w,k1,k2,t') ->
-      if var_eq v f || var_eq v w then t
-      else if SS.mem w fvars || SS.mem f fvars then
-        let avoid_vars = SS.union fvars (free_tvars_in_typ t') in
-        let f' = gen_var avoid_vars () in
-        let w' = gen_var avoid_vars () in
-        let t'_renamed = sub_in_typ (sub_in_typ t' w (VarT w')) f (VarT f') in
-        TRecT (f',w',k1,k2,aux t'_renamed)
-      else
-        TRecT (f,w,k1,k2,aux t')
-    | TCaseT (t1,t2,t3,t4,t5,t6,t7,t8) ->
-      TCaseT (aux t1, aux t2,
+    | TRecT (t1,t2,t3,t4,t5,t6,t7,t8) ->
+      TRecT (aux t1, aux t2,
               aux t3, aux t4,
               aux t5, aux t6, aux t7,
               aux t8)
   in
   aux t
 
+(*
 let multi_sub_in_typ (map:tenv) (t:typ) : typ =
-  SM.fold (fun v tv t -> sub_in_typ t v tv) map t
+  SM.fold (fun v tv t -> sub_in_typ t v tv) map t*)
 
 let sub_typ_in_exp (e:exp) (v:variable) (t:typ) : exp =
+  transform
+    (fun _ e -> e)
+    (fun b u -> if SS.mem v b then t else sub_in_typ u v t)
+    (fun s e ->
+       match e with
+       | TFun (v,_,_) -> SS.add v s
+       | TRec (f,v,_,_,_) -> SS.add f (SS.add v s)                           
+       | _ -> s)
+    SS.empty
+    e
   
 
 let free_vars (e:exp) : SS.t =
@@ -292,9 +286,8 @@ let free_vars (e:exp) : SS.t =
         SS.union (aux e1 bound)
                  (aux e2 bound)
     | TFun (_,_,e') -> aux e' bound
-    | TApp (e',_) -> aux e' bound
     | TRec (f,v,k,t,e') -> aux e' bound
-    | TLet (_,_,e') -> aux e' bound
+    | TApp (e',_) -> aux e' bound
     | Closure _ | RecClosure _ -> SS.empty
     | TCase (tyop,alpha,
                 eint,ebool,estr,evoid,
@@ -314,9 +307,7 @@ let rec normalize_type (t:typ) : typ =
                             normalize_type t2)
   | ListT u -> ListT (normalize_type u)
   | ForallT (v,k,t') -> ForallT (v,k,normalize_type t')
-  (*| TFunT (v,k,t') -> TFunT (v,k,normalize_type t')
-    | TRecT (f,v,k1,k2,t') -> TRecT (f,v,k1,k2,normalize_type t')*)
-  | TFunT _ | TRecT _ -> t
+  | TFunT (v,k,t') -> TFunT (v,k,normalize_type t')
   | TAppT (t1,t2) ->
     let t1' = normalize_type t1 in
     let t2' = normalize_type t2 in
@@ -324,12 +315,8 @@ let rec normalize_type (t:typ) : typ =
      | TFunT (v,k,t1'_body) ->
        let subbed = sub_in_typ t1'_body v t2' in
        normalize_type subbed
-     | TRecT (f,v,k1,k2,t1'_body) ->
-       let subbed = sub_in_typ t1'_body v t2' in
-       let subbed = sub_in_typ subbed f t1' in
-       normalize_type subbed
      | _ -> TAppT (t1',t2'))
-  | TCaseT (alpha,tint,tbool,tstr,tvoid,
+  | TRecT (alpha,tint,tbool,tstr,tvoid,
             tfun,tpair,tlist) ->
     let alpha = normalize_type alpha in
     (* typechecker guarantees that alpha has kind *
@@ -341,15 +328,85 @@ let rec normalize_type (t:typ) : typ =
     let tfun = normalize_type tfun in
     let tpair = normalize_type tpair in
     let tlist = normalize_type tlist in
+
+    let typecase_of s = TRecT (s,tint,tbool,tstr,tvoid,tfun,tpair,tlist) in
     (match alpha with
      | IntT -> tint
      | BoolT -> tbool
      | StrT -> tstr
      | VoidT -> tvoid
-     | FunT (a,b) -> normalize_type (TAppT (TAppT (tfun, a),b))
-     | PairT (a,b) -> normalize_type (TAppT (TAppT (tpair, a), b))
-     | ListT a -> normalize_type (TAppT (tlist,a))
-     | VarT _ -> TCaseT (alpha,tint,tbool,tstr,tvoid,tfun,tpair,tlist)
-     | _ -> raise (Failure "bad Typecase"))
+     | FunT (a,b) -> normalize_type (TAppT (TAppT (TAppT (TAppT (tfun, a),b),
+                                              typecase_of a), typecase_of b))
+     | PairT (a,b) -> normalize_type (TAppT (TAppT (TAppT (TAppT (tpair, a),b),
+                                              typecase_of a), typecase_of b))
 
+
+     | ListT a -> normalize_type (TAppT (TAppT (tlist,a), typecase_of a))
+     | VarT _ | TAppT _ | TRecT _ -> typecase_of alpha 
+     | ForallT _ | NoneT  -> raise (Failure "bad Typecase"))
+
+
+let rec typ_eq t u =
+  match t, u with
+  | BoolT, BoolT
+  | IntT, IntT
+  | StrT, StrT
+  | VoidT, VoidT -> true
+  | FunT (t1,t2), FunT (u1,u2)
+  | PairT (t1,t2), PairT (u1,u2)
+  | TAppT (t1,t2) , TAppT (u1,u2) -> (typ_eq t1 u1) && (typ_eq t2 u2)
+  | ListT t', ListT u' -> typ_eq t' u'
+  | ForallT (tv,tk,t'), ForallT (uv,uk,u')
+  | TFunT (tv,tk,t'), TFunT (uv,uk,u') ->
+    let u' = sub_in_typ u' uv (VarT tv) in
+    typ_eq t' u'
+  | TRecT (alpha,t1,t2,t3,t4,t5,t6,t7), TRecT (beta,u1,u2,u3,u4,u5,u6,u7) ->
+    List.for_all2 typ_eq
+      [alpha;t1;t2;t3;t4;t5;t6;t7]
+      [beta;u1;u2;u3;u4;u5;u6;u7]
+  | VarT v, VarT w -> var_eq v w
+  | _ -> false
+
+let typ_equiv (t:typ) (u:typ) : bool =
+  typ_eq (normalize_type t) (normalize_type u)
+
+(* Generalization of substitution where the thing being
+   replaced can be any type expression. Types are compared
+   with typ_eq (not typ_equiv) *)
+let rec replace_typ (t:typ) (v:typ) (u:typ) : typ =
+  let ufvars = free_tvars_in_typ u in
+  let vfvars = free_tvars_in_typ v in
+  let rec aux t =
+    if typ_eq t v then u else
+    match t with
+    | BoolT | IntT | StrT | VoidT | NoneT | VarT _ -> t
+    | FunT (t1,t2) -> FunT (aux t1, aux t2)
+    | PairT (t1,t2) -> PairT (aux t1, aux t2)
+    | ListT t1 -> ListT (aux t1)
+    | ForallT (v',k,t') ->
+      if SS.mem v' vfvars then t
+      else if SS.mem v' ufvars then
+	let avoid_vars = SS.union ufvars (free_tvars_in_typ t') in
+	let w = gen_var avoid_vars () in
+	let t'_renamed = sub_in_typ t' v' (VarT w) in
+        ForallT (w, k,aux t'_renamed)
+      else
+	ForallT (v',k,aux t')
+    | TAppT (t1,t2) -> TAppT (aux t1, aux t2)
+    | TFunT (v',k,t') ->
+      if SS.mem v' vfvars then t
+      else if SS.mem v' ufvars then
+	let avoid_vars = SS.union ufvars (free_tvars_in_typ t') in
+	let w = gen_var avoid_vars () in
+	let t'_renamed = sub_in_typ t' v' (VarT w) in
+	TFunT (w, k,aux t'_renamed)
+      else
+	TFunT (v',k,aux t')
+    | TRecT (t1,t2,t3,t4,t5,t6,t7,t8) ->
+      TRecT (aux t1, aux t2,
+              aux t3, aux t4,
+              aux t5, aux t6, aux t7,
+              aux t8)
+  in
+  aux t
 

@@ -1,3 +1,14 @@
+let type S (X::*) =
+  Typecase S [X] :: * of
+  | int => int
+  | bool => bool
+  | str => str
+  | void => void
+  | b -> c => void
+  | b * c => S[b] * S[c]
+  | list b => list (S[b])
+  end
+in
 let rec int_to_string (n:int) : str =
   if n == 0 then "0"
   else if n == 1 then "1"
@@ -15,8 +26,8 @@ in
 let bool_to_string (b:bool) : str =
   if b then "true" else "false"
 in
-let fold:forall a. forall b. (a -> b -> b) -> b -> list a -> b =
-    tfun a b => 
+let fold:forall (a::*). forall (b::*). (a -> b -> b) -> b -> list a -> b =
+    /\ (a::*) (b::*) => 
     let rec foldab (f:a -> b -> b) (base:b) (l:list a) : b =
       match l with
       | nil => base
@@ -25,15 +36,18 @@ let fold:forall a. forall b. (a -> b -> b) -> b -> list a -> b =
     in
     foldab
 in
-let to_string : (forall a. a -> str) =
- trec aux a : a -> str =>
- typecase [d.d -> str] a of
+let to_string : (forall (a::*). S[a] -> str) =
+ rec /\ aux (a::*) : S[a] -> str =>
+ typecase [\\ (d::*) => (S[d] -> str)] a of
  | int => int_to_string
  | bool => bool_to_string
- | str => (fun (s:str) => s)
- | b -> c => (fun (f: b -> c) => "<function>")
- | b * c => (fun (p: b * c) => "(" ++ (aux [b] (fst p)) ++ "," ++ (aux [c] (snd p)) ++ ")")
- | list b => (fun (l:list b) => fold [b] [str] (fun (x:b) (s:str) => (aux [b] x) ++ s) "" l)
+ | str => (\ (s:str) => s)
+ | void => (\ (v:void) => "")
+ | b -> c => (\ (v:void) => "")
+ | b * c => (\ (p: S[b * c]) => "(" ++ (aux [b] (fst p)) ++ "," ++ (aux [c] (snd p)) ++ ")")
+ | list b => (\ (l:S[list b]) => fold [S[b]] [str] (\ (x:S[b]) (s:str) => (aux [b] x) ++ s) "" l)
  end
 in
-fold [int] [int] (fun (x:int) (y:int) => x + y) 0 (1::2::3::4::5::6::7::(nil:list int))
+let x:int = fold [int] [int] (\ (x:int) (y:int) => x + y) 0 (1::2::3::4::5::6::7::(nil:list int))
+in
+"cock" ++ (to_string [int->int] (\ (x:int) => x+1))

@@ -18,9 +18,8 @@ type typ =
   | ForallT of variable * kind * typ
   | VarT of variable
   | TFunT of variable * kind * typ
-  | TRecT of variable * variable * kind * kind * typ
   | TAppT of typ * typ
-  | TCaseT of typ *
+  | TRecT of typ *
               typ * typ * typ *
               typ * typ * typ * typ
   | NoneT
@@ -57,7 +56,6 @@ type exp =
   | TRec of variable * variable * kind * typ * exp
   | TApp of exp * typ
 
-  | TLet of variable * typ * exp
               (* Closures *)		       
   | Closure of env * tenv * variable * exp
   | RecClosure of env * tenv * variable * variable * exp

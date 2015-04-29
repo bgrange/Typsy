@@ -1,5 +1,5 @@
 open Common
-open TypedSyntax
+open Syntax
 
 exception Inference_error
 

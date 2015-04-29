@@ -3,7 +3,7 @@
 (*************************************************)
 
 open Common
-open TypedSyntax
+open Syntax
 open Util
        
 exception BadList of exp
@@ -77,10 +77,8 @@ let sub_all (tenv:tenv) (t:typ) : typ =
     | ForallT (v,k,u) -> ForallT (v,k,aux u (SS.add v b))
     | TFunT (v,k,u) -> TFunT (v,k,aux u (SS.add v b))
     | TAppT (t1,t2) -> TAppT (aux t1 b, aux t2 b)
-    | TRecT (f,v,k1,k2,u) -> TRecT (f,v,k1,k2,
-                                    aux u (SS.add f (SS.add v b)))
-    | TCaseT (alpha,t1,t2,t3,t4,t5,t6,t7) ->
-      TCaseT (aux alpha b,
+    | TRecT (alpha,t1,t2,t3,t4,t5,t6,t7) ->
+      TRecT (aux alpha b,
               aux t1 b, aux t2 b,
               aux t3 b, aux t4 b,
               aux t5 b, aux t6 b,

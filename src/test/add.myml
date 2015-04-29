@@ -1,1 +1,1 @@
-(fun (x:int) (y:int) z => x + y + z)
+(\ (x:int) (y:int) (z:int) => x + y + z) 1 2 3

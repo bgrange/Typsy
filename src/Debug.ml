@@ -1,5 +1,7 @@
-let t = ParseEval.parse_typ "test/tcaset.myml";;
+let t1 = ParseEval.parse_typ "test/tcaset.myml";;
+let t2 = ParseEval.parse_typ "test/tcaset2.myml" ;;
 
-let t' = Convert.convert_typ t ;;
+let t1' = Convert.convert_typ t1 ;;
+let t2' = Convert.convert_typ t2 ;;
 
-print_endline (Pretty.string_of_typ (Util.normalize_type t')) ;;
+Util.typ_equiv t1' t2' ;;

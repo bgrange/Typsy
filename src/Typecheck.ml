@@ -1,4 +1,4 @@
-open TypedSyntax
+open Syntax
 open Common
   
 (* Finds type of an expression given annotated function
@@ -43,11 +43,6 @@ let rec kindof_ (ctx : kind SM.t) (t:typ) =
   | TFunT (v,k,u) ->
     let body_kind = kindof_ (SM.add v k ctx) u in
     ArrowK (k,body_kind)
-  | TRecT (f,v,k1,k2,u) ->
-    let kf = ArrowK (k1,k2) in
-    let ku = kindof_ (SM.add f kf (SM.add v k1 ctx)) u in
-    expectk ku k2 ;
-    kf
   | TAppT (t1,t2) ->
     let k1 = kindof_ ctx t1 in
     let k2 = kindof_ ctx t2 in
@@ -56,7 +51,7 @@ let rec kindof_ (ctx : kind SM.t) (t:typ) =
      | ArrowK (k11,k12) ->
        expectk k11 k2;
        k12)
-  | TCaseT (alpha,tint,tbool,tstr,tvoid,
+  | TRecT (alpha,tint,tbool,tstr,tvoid,
             tfun,tpair,tlist) ->
     expectk TypeK (kindof_ ctx alpha) ;
     let k = kindof_ ctx tint in
@@ -64,44 +59,14 @@ let rec kindof_ (ctx : kind SM.t) (t:typ) =
     expectk k (kindof_ ctx tstr) ;
     expectk k (kindof_ ctx tvoid) ;
 
-    let star_k = ArrowK (TypeK,k) in
-    let star_star_k = ArrowK (TypeK, star_k) in
-    expectk star_star_k (kindof_ ctx tfun) ;
-    expectk star_star_k (kindof_ ctx tpair) ;
-    expectk star_k (kindof_ ctx tlist) ;
+    let star_star_k_k_k = ArrowK (TypeK, ArrowK (TypeK,ArrowK(k,ArrowK (k, k)))) in
+    let star_k_k = ArrowK (TypeK, ArrowK (k,k)) in
+    expectk star_star_k_k_k (kindof_ ctx tfun) ;
+    expectk star_star_k_k_k (kindof_ ctx tpair) ;
+    expectk star_k_k (kindof_ ctx tlist) ;
     k
     
 let kindof t = kindof_ SM.empty t
-
-let rec typ_eq t u =
-  match t, u with
-  | BoolT, BoolT
-  | IntT, IntT
-  | StrT, StrT
-  | VoidT, VoidT -> true
-  | FunT (t1,t2), FunT (u1,u2)
-  | PairT (t1,t2), PairT (u1,u2) -> (typ_eq t1 u1) && (typ_eq t2 u2)
-  | ListT t', ListT u' -> typ_eq t' u'
-  | ForallT (tv,tk,t'), ForallT (uv,uk,u')
-  | TFunT (tv,tk,t'), TFunT (uv,uk,u') ->
-    let u' = Util.sub_in_typ u' uv (VarT tv) in
-    typ_eq t' u'
-  | TRecT (tf,tv,tk1,tk2,t'), TRecT (uf,uv,uk1,uk2,u') ->
-    let u' = Util.sub_in_typ u' uf (VarT tf) in
-    let u' = Util.sub_in_typ u' uv (VarT tv) in
-    typ_eq t' u'
-  | TCaseT (alpha,t1,t2,t3,t4,t5,t6,t7), TCaseT (beta,u1,u2,u3,u4,u5,u6,u7) ->
-    List.for_all2 typ_eq
-      [alpha;t1;t2;t3;t4;t5;t6;t7]
-      [beta;u1;u2;u3;u4;u5;u6;u7]
-  | VarT v, VarT w -> var_eq v w
-  | _ -> false
-
-let typ_equiv (t:typ) (u:typ) : bool =
-  let kt = kindof t in
-  let ku = kindof u in
-  if kt <> ku then false
-  else typ_eq (Util.normalize_type t) (Util.normalize_type u)
 				
 let op_type (op:operator) : typ =
   match op with
@@ -114,11 +79,11 @@ let op_type (op:operator) : typ =
 
 let rec is_polytype (t:typ) : bool =
   match t with
-  | BoolT | IntT | StrT | VarT _ | VoidT -> false
+  | BoolT | IntT | StrT | VarT _ | VoidT | NoneT -> false
   | FunT (t1,t2) | PairT (t1,t2) | TAppT(t1,t2) ->
     is_polytype t1 || is_polytype t2
-  | ListT u | TFunT (_,_,u) | TRecT (_,_,_,_,u) -> is_polytype u
-  | TCaseT (alpha,t1,t2,t3,t4,t5,t6,t7) ->
+  | ListT u | TFunT (_,_,u) -> is_polytype u
+  | TRecT (alpha,t1,t2,t3,t4,t5,t6,t7) ->
     List.exists is_polytype [t1;t2;t3;t4;t5;t6;t7]
   | ForallT _ -> true
 
@@ -134,7 +99,7 @@ let mismatch' s t =
                      ", got type " ^ (Pretty.string_of_typ t)))
     
 let expect (t1:typ) (t2:typ) : unit =
-  if not (typ_eq t1 t2) then mismatch t1 t2
+  if not (Util.typ_eq t1 t2) then mismatch t1 t2
 
 (* I want to maintain the invariant that typeof_ *always* returns a
    normalized type. Usually this is easy *)

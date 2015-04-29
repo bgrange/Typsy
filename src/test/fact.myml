@@ -1,5 +1,5 @@
-let fact (n:int) : int =
-  let rec aux (n:int) (acc:int) : int =
+let fact (n:Int) : Int =
+  let rec aux (n:Int) (acc:Int) : Int =
     if n <= 1 then acc
     else aux (n - 1) (n * acc)
   in

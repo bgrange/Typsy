@@ -1,1 +1,0 @@
-forall (a::*) (b::*). (a -> b) -> list a -> list b 
