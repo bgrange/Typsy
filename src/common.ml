@@ -1,5 +1,7 @@
 exception Impossible_error
 
+type filename = string
+
 type variable = string
   deriving (Show)
 

@@ -64,3 +64,11 @@ type exp =
   | RecClosure of env * tenv * variable * variable * exp
 and env = exp SM.t
 and tenv = typ SM.t
+
+type prog_unit =
+  | Anon of exp
+  | Value of variable * exp
+  | Typ of variable * typ
+  | Use of filename
+
+type prog = prog_unit list

@@ -86,10 +86,22 @@ let to_kind (k_opt:kind option) : kind =
 %token VOID_TYP
 %token TYPE
 %token STRLEN
+%token VALUE
+%token USE
+%token SEMI
 %start <Parsed_syntax.exp> parse_exp
 %start <Parsed_syntax.typ> parse_typ
+%start <Parsed_syntax.prog> parse_prog
 %%
 
+prog:
+  | p = separated_list(SEMI,prog_unit)      { p }
+
+prog_unit:
+  | VALUE; id = ID; ASSIGN; e = exp;       { Value (id,e) }
+  | TYPE; id = TYP_ID; t = typ;             { Typ (id,t) }
+  | e = exp                                { Anon e }
+  | USE; s = STR;                          { Use s } 
 
 parse_exp:
         | e = exp; EOF          { e }

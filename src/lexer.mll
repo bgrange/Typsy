@@ -39,6 +39,7 @@ rule read =
        | '('      { LPAREN }
        | ')'      { RPAREN }
        | ':'      { COLON }
+       | ';'      { SEMI }
        | '*'      { STAR }	     
        | "->"     { ARROW }
        | "=>"     { BIG_ARROW }
@@ -75,7 +76,9 @@ rule read =
        | "Typerec"    { TRECT }
        | "fst"    { FST }
        | "snd"    { SND }
-       | "strlen" { STRLEN }        
+       | "strlen" { STRLEN }
+       | "value"  { VALUE }
+       | "use"    { USE }
        | id       { ID (Lexing.lexeme lexbuf) }
        | typ_id   { TYP_ID (Lexing.lexeme lexbuf) }
        | ','      { COMMA }
