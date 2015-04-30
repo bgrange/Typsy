@@ -122,7 +122,8 @@ let rec typeof_ (ctx : typ SM.t) (tctx : kind SM.t) (e : exp) : typ =
       (match c with
        | Int n -> IntT
        | Bool b -> BoolT
-       | Str s -> StrT)
+       | Str s -> StrT
+       | Emp -> FunT(VoidT,VoidT))
   | Binop (e1,op,e2) ->
      let e1_typ = typeof_ ctx tctx e1 in
      let e2_typ = typeof_ ctx tctx e2 in

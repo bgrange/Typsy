@@ -6,6 +6,7 @@ let string_of_const c =
     | Int i -> string_of_int i
     | Bool b -> string_of_bool b
     | Str s -> s
+    | Emp -> "{}"
 
 
 let string_of_unop op =

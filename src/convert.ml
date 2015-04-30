@@ -93,7 +93,7 @@ and convert_trect name alpha k cases =
                                             Syn.TFunT (tpairV2,k,
                                                       tpair)))),
               Syn.TFunT (f,Syn.TypeK,Syn.TFunT (tlistV,k,tlist)))
-  | _ -> raise (Conversion_error "malformed Typecase")
+  | _ -> raise (Conversion_error "malformed Typerec")
 
 
 let get_fun_typ args ret_typ =
