@@ -1243,7 +1243,11 @@ Compile with: \texttt{ocamlbuild -use-ocamlfind main.d.byte}
 
 Run with: \texttt{./main.d.byte <path-to-source>}
 
-There are plenty of examples in \texttt{src/test/}.
+There are plenty of examples in \texttt{src/test/}
+
+In particular, there are three examples there of advanced use of Typerec:
+\begin{itemize}
+\item \texttt{eq.
 
 \subsection{Language Syntax Reference}
 
