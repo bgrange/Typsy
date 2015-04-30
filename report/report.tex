@@ -27,16 +27,14 @@
   breakatwhitespace=false,         % sets if automatic breaks should only happen at whitespace
   breaklines=true,                 % sets automatic line breaking
   captionpos=b,                    % sets the caption-position to bottom
-  %commentstyle=\color{green},    % comment style
-  commentstyle=\ttfamily,
   deletekeywords={...},            % if you want to delete keywords from the given language
   escapeinside={\%*}{*)},          % if you want to add LaTeX within your code
   extendedchars=true,              % lets you use non-ASCII characters; for 8-bits encodings only, does not work with UTF-8
 %  frame=single,                    % adds a frame around the code
   keepspaces=true,                 % keeps spaces in text, useful for keeping indentation of code (possibly needs columns=flexible)
-  keywordstyle=\color{blue},       % keyword style
+  keywordstyle=\bfseries\color{black},       % keyword style
   language=Caml,                  % the language of the code
-  otherkeywords={*,...},            % if you want to add more keywords to the set
+  morekeywords={typecase,Typerec,module,struct,sig,Typecase},            % if you want to add more keywords to the set
   numbers=none,                    % where to put the line-numbers; possible values are (none, left, right)
   numbersep=5pt,                   % how far the line-numbers are from the code
   numberstyle=\tiny\color{gray}, % the style that is used for the line-numbers
@@ -45,13 +43,14 @@
   showstringspaces=false,          % underline spaces within strings only
   showtabs=false,                  % show tabs within strings adding particular underscores
   stepnumber=2,                    % the step between two line-numbers. If it's 1, each line will be numbered
-  stringstyle=\color{mauve},     % string literal style
   tabsize=2,                       % sets default tabsize to 2 spaces
   title=\lstname                   % show the filename of files included with \lstinputlisting; also try caption instead of title
 }
 
 \newcommand{\lsti}{\lstinline}
 \newcommand{\lstiH}{\lsti[language=Haskell]}
+
+
 
 \title{Typsy: An ML-like programming language with typeclasses}
 
@@ -61,15 +60,10 @@
 \thispagestyle{empty}
 
 \begin{abstract}
-
-\end{abstract}
-
-\section{Introduction}
-
 In this paper, I describe the development of a programming language with a sophisticated type system.
 Starting from the untyped lambda calculus, I add simple types, parametric polymorphism, type operators,
-and finally the Typerec construct. These features allow us to encode Haskell typeclasses in an elegant way.
-
+and finally the typecase and Typerec constructs. These features allow us to encode Haskell typeclasses in an elegant way. Code is available at \url{https://github.com/bgrange/independent-work}.
+\end{abstract}
 
 \section{Untyped Lambda Calculus}
 While the Turing machine is the model of computation that gets the most popular attention,
@@ -128,7 +122,7 @@ change the way we perform substitution. The problem in $e$ is essentially that t
 renaming the bound variable to something other than $y$. (This is called $\alpha$-conversion.)
 
 If we denote substitution of $x$ with $f$ in $e$ by $[x \mapsto f]e$,
-and the free variables of $e$ by $FV(e)$, our substitution function is as follows:
+and the free variables of $e$ by $FV(e)$, our substitution function is as follows\cite{pierce2002types}:
 \[
 \begin{aligned}
 & [x \mapsto e]x &= \qquad &e\\
@@ -215,7 +209,7 @@ the environment.
 \item When evaluating a function, save the values of all of its free variables in a \textit{closure}.
 Otherwise, when we use the function later in a (possibly) different environment, its free variables
 may be shadowed.
-\item The evaluation function now needs to be parameterized by an environment
+\item The evaluation function now needs to be parameterized by an environment.
 \end{itemize}
 
 %The other point is that it is impractical to implement a programming language by simply transcribing the
@@ -311,14 +305,12 @@ type typ =
 
 \subsubsection{Variables}
 Since variables can be of any type, in order to (easily) typecheck expressions with variables in them, we need to annotate variables with a type when they are bound in $\lambda$ terms.  Furthermore, as we're typechecking, we need to carry this information around in a \textit{context}. Contexts are similar to environments; but instead of mapping variables to
-values, contexts map variables to their types. For instance, in order to typecheck the expression $x + 1$, we need a context telling us the type of $x$. If $x$ was annotated with
-type $Int \rightarrow Bool$, then the expression is \textit{not} well-typed, but if
-it was annotated with type $Int$, then the expression is well-typed. So we should modify our
-notation now, since expressions can only have type relative to a given context.
+values, contexts map variables to their types. For instance, in order to typecheck the expression $x + 1$, we need a context telling us the type of $x$. So we need to modify our
+notation now, since expressions only have types relative to a given context.
 To say that $e$ has type $T$ in context $\Gamma$, we write $\Gamma \vdash e:T$.
 
 \subsubsection{Typing Rules}
-The typing rules are fairly straightforward:
+The typing rules are fairly straightforward\cite{pierce2002types}:
 
 \begin{prooftree}
 \AxiomC{}
@@ -490,7 +482,7 @@ $X$ is a \textit{type variable}, and $T$ is a type, in which $X$ can occur free.
 has type $\forall X.T$, we can think of this as meaning that $e$ has type $T$ \textit{for all} possible
 types $X$.
 
-The typing rules for $\forall$ types are:
+The typing rules for $\forall$ types are\cite{pierce2002types}:
 
 \begin{prooftree}
 \AxiomC{$\Gamma \cup \{X\} \vdash e : T$}
@@ -704,8 +696,8 @@ anyway.
 
 \subsection{Notes on syntax}
 
-At first I designed the syntax such that every function construct---non-recursive value-level functions, recursive value-level functions, non-recursive type-abstractions, and (as I'll get to shortly) recursive type-abstractions---was written differently. There were \lsti{fun}'s, \lsti{tfun}'s, \lsti{rec}'s, and
-\lsti{trec}'s. This was unambiguous but cumbersome. To improve code clarity, I decided to
+At first I designed the syntax such that every function construct---non-recursive value-level functions, recursive value-level functions, non-recursive type-abstractions, and (as I'll get to shortly) recursive type-abstractions---was written differently. There were \texttt{fun}'s, \texttt{tfun}'s, \texttt{rec}'s, and
+\texttt{trec}'s. This was unambiguous but cumbersome. To improve code clarity, I decided to
 designate normal functions and type abstractions with the same backslash syntax.
 The type of the function could be inferred by parameter names: type variables always start with an
 uppercase letter, and regular variables, a lowercase letter. Finally, the \lsti{rec} keyword can be
@@ -714,7 +706,7 @@ prepended to any function uniformly.
 Furthermore, type parameters and regular parameters can be mixed in a single function expression,
 or a single let expression.
 
-These changes \textit{vastly} improved the syntax.
+These changes \textit{vastly} improved writability and readability.
 
 \section{typecase, Typecase, and Typeclass}
 
@@ -844,8 +836,7 @@ type \lsti{A}.
 
 Note that we need to bind type variables in evaluating the branches for the complex types. For example,
 in evaluating \lsti{to_string [Int -> Bool]}, we need to bind \lsti{T1} to \lsti{Int} and \lsti{T2} to \lsti{Bool} before we evaluate the branch body. 
-Given this observation, we can make the code a little bit more elegant
-by representing these branches as type functions. So we can represent the function branch by
+Given this observation, we can represent these branches as type functions. So we can represent the function branch by
 \lsti{(\ T1 T2 => <branch-body>)}, and likewise for the list and pair branches. This transformation
 occurs in the \lsti{Convert} module.
 
@@ -894,7 +885,7 @@ we can implement their method.
 First we need to make a big addition to the typesystem, namely type operators.
 We already have functions taking types as arguments and returning expressions, but a type operator takes
 a type as argument and \textit{also returns a type}.
-Type operators are basically a copy of the lambda calculus one level up.  In the literature, type operators are usually written with the same $\lambda$ syntax as regular term-level functions, but to differentiate the two, I use a double-slash \lsti{\\} in my language syntax for type operators. As an example, we can define
+Type operators are basically a copy of the lambda calculus one level up.  In the literature, type operators are usually written with the same $\lambda$ syntax as regular term-level functions, but to differentiate the two, Typsy uses a double-slash \lsti{\\} for type operators. As an example, we can define
 a pairing type operator which takes any type and returns the type of pairs of that type:
 
 \begin{lstlisting}
@@ -1002,12 +993,12 @@ which involves \textit{going underneath the $\lambda$}.
 
 \subsection{Typecase/Typerec}
 
-Harper and Morrisett introduce both a value-level \lsti{typecase} form, and a type-level \lsti{Typecase} form.
+Harper and Morrisett introduce both a value-level \lsti{typecase} form, and a type-level \lsti{Typerec} form.
 The two are analogous in that they both match on a type argument. However, the latter returns a type rather
 than a term. As a use case Harper and Morrisett give the example of an type operator which
 gives a representation for an array that depends on the type of the array elements, for more efficient use
 of memory\footnote{This is just pseudocode to motivate the idea. In Typsy, there has to be a branch
-for each of \lsti{Int}, \lsti{bool}, \lsti{str}, \lsti{void}, functions, products, and lists, in that order. (I'll explain
+for each of \lsti{Int}, \lsti{Bool}, \lsti{Str}, \lsti{Void}, functions, products, and lists, in that order. (I'll explain
 void soon).}:
 
 \begin{lstlisting}[mathescape]
@@ -1094,10 +1085,10 @@ Harper and Morrisett do. Their kinding (or ``formation'') rule is almost the sam
 \UnaryInfC{$\Gamma \vdash \mu_{\rightarrow} :: * \rightarrow * \rightarrow \kappa \rightarrow \kappa \rightarrow \kappa$}
 \UnaryInfC{$\Gamma \vdash$ Typerec $\mu$ of $(\mu_i|\mu_{\rightarrow}|\mu_{\times}) :: \kappa$}
 \end{prooftree}
-The only difference is that we added extra parameters to the $\mu_{\times}$ and $\mu_{\rightarrow}$ type operators.
+The only difference is that here there are extra parameters to the $\mu_{\times}$ and $\mu_{\rightarrow}$ type operators.
 These parameters represent the \textit{result of the Typerec evaluated at the given type's components}.
 
-Then the equivalence rules are\footnote{I give two of the rules here. The others are similar}:
+Then the equivalence rules are\footnote{I give two of the rules here. The others are similar.}:
 
 \begin{prooftree}
 \AxiomC{}
@@ -1136,14 +1127,15 @@ To accomplish this, I wrote a sort of "generalized substitution" function, which
 
 \subsubsection{Possible Alternative Encoding}
 The so-called generalized subsitution that we need in order to implement Typerec is ugly.
-And maybe the Typerec operator itself is ugly. It it most natural to represent Typerec as a type operator
-that \textit{can be applied} to things, but in the representation from \cite{harper-typecase}, that view of them is merely syntactic sugar.
+And maybe this representation of Typerec itself is ugly. It it most natural to represent Typerec as a type operator
+that \textit{can be applied} to things, but in the representation from \cite{harper-typecase}, that view of them is merely syntactic sugar. (It's syntactic sugar in the sense that the call \lsti[mathescape]{RecArray [$\tau$]} is not
+actually a call at all; it's just a reference to a bound variable.)
 We can combine the best of the above two representations in a third, in which a Typerec can be applied to
 an argument as in my first attempt, and in which we substitute less eagerly, thereby avoiding infinite loops,
 as in the second.
 
-In this representation, there is no type argument ``baked in'' to the construct.
-That is, the following is be well-defined:
+In this representation, the type argument $\alpha$ is not required syntactically by the construct.
+That is, the following is well-defined:
 
 \begin{lstlisting}[mathescape]
 Typerec RecArray of
@@ -1152,10 +1144,10 @@ Typerec RecArray of
 ...
 \end{lstlisting}
 
-And in this case, to use the Typerec we need to apply it to an argument.
+This type then has kind $* \rightarrow *$, and we can apply it to an argument.
 
-The other difference from \cite{harper-typecase} is that in the complex branches, we bind the whole
-operator, rather than its value at some particular argument.
+The other difference from \cite{harper-typecase} is that in the complex branches, we bind the
+operator itself, rather than its value at some particular argument.
 So the product branch of \lsti{RecArray} in this representation would look like:
 
 \begin{lstlisting}[mathescape]
@@ -1189,9 +1181,16 @@ And the new equivalence rules would be:
 This seems like the most natural representation for Typerec. However, I didn't implement it for lack of time.
 
 \subsection{Void}
-We're nearly there. The last step is to add a $void$ type, which is the empty type.
-This was a really trivial extension to the language since nothing ever has this type!
-The typing rules for the void type are:
+We're nearly there. The last step is to add a $Void$ type, which is the empty type.
+This was a really trivial extension to the language since nothing ever has this type.
+
+However, we could imagine something having type $Void \rightarrow Void$. There's nothing ``inconsistent''
+about it, unlike the type $Bool \rightarrow Void$, for instance.\footnote{If we had a value of type
+$Bool \rightarrow Void$, we'd have a way to construct a value of type $Void$ which is impossible.}
+If we think of functions as being sets of pairs, then we can easily find a value of type
+$Void \rightarrow Void$---namely the empty set. Since there's no way to construct the empty function
+so far, I added a special primitive for it, denoted by \{\}. It might seem pretty useless, but I needed it in
+\texttt{test/monoid.typ} to make everything typecheck.
 
 \subsection{Encoding Typeclasses}
 Returning to the to_string function from before, we want the typechecker to prevent us from calling
@@ -1245,14 +1244,15 @@ Run with: \texttt{./typsy.d.byte <path-to-source>}
 
 There are plenty of examples in \texttt{src/test/}. In particular, there are three examples there of advanced use of Typerec:
 \begin{itemize}
-\item \texttt{show.typ} is almost identical to the \texttt{to_string} example given in this report.
+\item \texttt{show.typ} is a complete version of the \texttt{to_string} example given in this report.
 \item \texttt{eq.typ} defines a type-predicate for equality. Specifically, anything but function types
 can be compared for equality. Then I use equality to write a generic list-lookup function.
-\item \texttt{monoid.typ} defines several auxiliary type operators---including one which compares two types for
-equality---and then defines the monoid type predicate. (A monoid is just a set with an associative operation and
-identity.) This predicate is then used to define a generic plus function. This was only tricky
+\item \texttt{monoid.typ} defines an auxiliary type operator  which compares two types for
+equality, and then defines the monoid type predicate. (A monoid is just a set with an associative operation and
+identity.) This predicate is then used to define a generic plus function. (We need to be able to test
+for type equality because a function type only has ``addition'' (i.e. composition) if its domain and codomain
+are the same. Alas we can't just do \lsti{instance Monoid (X -> X) where...}.)
 
-\subsection{Language Syntax Reference}
 
 \nocite{*}
 \bstctlcite{bstctl:etal, bstctl:nodash, bstctl:simpurl}

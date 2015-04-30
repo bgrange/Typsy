@@ -85,6 +85,8 @@ rule read =
        | _ { raise (SyntaxError ("Unexpected char: " ^ Lexing.lexeme lexbuf)) }
        | eof      { EOF }
 
+(* read_string was borrowed from
+https://realworldocaml.org/v1/en/html/parsing-with-ocamllex-and-menhir.html*)
 and read_string buf =
   parse
 | '"'       { STR (Buffer.contents buf) }

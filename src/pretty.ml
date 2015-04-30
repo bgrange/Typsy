@@ -1,3 +1,6 @@
+(* Note that I used code from a COS 326 assignment as the starting point for the
+pretty printing function  *)
+
 open Syntax
 open Common
 

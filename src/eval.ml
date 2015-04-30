@@ -1,6 +1,5 @@
-(*************************************************)
-(* An environment-based evaluator for Dynamic ML *)
-(*************************************************)
+(* Note that I used code from a COS 326 assignment as the starting point for the
+evaluation function  *)
 
 open Common
 open Syntax
