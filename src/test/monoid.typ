@@ -1,74 +1,3 @@
-// First we define an auxiliary type operator which takes two types
-// and if either of them is void, gives back void. If neither is
-// void, then it combines the types according to Combine
-// Very messy I know.
-// Could be improved by having a default branch.
-let type And (X::*) =
- Typerec And [X] :: * -> (* -> * -> *) -> * of
- | Int => \\ (Y::*) (Combine::* -> * -> *) => 
-          Typerec And2 [Y] :: * of
-          | Int => Combine [X] [Y]
-	  | Bool => Combine [X] [Y]
-	  | Str => Combine [X] [Y]
-	  | Void => Void
-	  | S -> T => Combine [X] [Y]
-	  | S * T => Combine [X] [Y]
-	  | List S => Combine [X] [Y]
-	  end
- | Bool => \\ (Y::*) (Combine::* -> * -> *) =>
-          Typerec And2 [Y] :: * of
-          | Int => Combine [X] [Y]
-	  | Bool => Combine [X] [Y]
-	  | Str => Combine [X] [Y]
-	  | Void => Void
-	  | S -> T => Combine [X] [Y]
-	  | S * T => Combine [X] [Y]
-	  | List S => Combine [X] [Y]
-	  end
- | Str => \\ (Y::*) (Combine::* -> * -> *) =>
-          Typerec And2 [Y] :: * of
-          | Int => Combine [X] [Y]
-	  | Bool => Combine [X] [Y]
-	  | Str => Combine [X] [Y]
-	  | Void => Void
-	  | S -> T => Combine [X] [Y]
-	  | S * T => Combine [X] [Y]
-	  | List S => Combine [X] [Y]
-	  end
- | Void => (\\ (Y::*) (Combine::* -> * -> *) => Void)
- | S -> T => \\ (Y::*) (Combine::* -> * -> *) =>
-          Typerec And2 [Y] :: * of
-          | Int => Combine [X] [Y]
-	  | Bool => Combine [X] [Y]
-	  | Str => Combine [X] [Y]
-	  | Void => Void
-	  | S -> T => Combine [X] [Y]
-	  | S * T => Combine [X] [Y]
-	  | List S => Combine [X] [Y]
-	  end
- | S * T=> \\ (Y::*) (Combine::* -> * -> *) =>
-          Typerec And2 [Y] :: * of
-          | Int => Combine [X] [Y]
-	  | Bool => Combine [X] [Y]
-	  | Str => Combine [X] [Y]
-	  | Void => Void
-	  | S -> T => Combine [X] [Y]
-	  | S * T => Combine [X] [Y]
-	  | List S => Combine [X] [Y]
-	  end
- | List S=> \\ (Y::*) (Combine::* -> * -> *) =>
-          Typerec And2 [Y] :: * of
-          | Int => Combine [X] [Y]
-	  | Bool => Combine [X] [Y]
-	  | Str => Combine [X] [Y]
-	  | Void => Void
-	  | S -> T => Combine [X] [Y]
-	  | S * T => Combine [X] [Y]
-	  | List S => Combine [X] [Y]
-	  end
- end
-in
-
 // This type operator tests for equality between types
 let type TEq (X::*) =
  Typerec TEq [X] :: * -> * of
@@ -109,7 +38,7 @@ let type TEq (X::*) =
 	   | Bool => Bool
 	   | Str => Void
 	   | Void => Void
-	   | S2 -> T2 => And [TEq [S] [S2]] [TEq [T] [T2]] [\\ (A::*) (B::*) => A -> B]
+	   | S2 -> T2 => (TEq [S] [S2]) -> (TEq [T] [T2])
 	   | S2 * T2 => Void	   
 	   | List S2 => Void
 	   end
@@ -120,8 +49,8 @@ let type TEq (X::*) =
 	   | Str => Void
 	   | Void => Void
 	   | S2 -> T2 => Void
-	   | S2 * T2 => And [TEq [S] [S2]] [TEq [T] [T2]] [\\ (A::*) (B::*) => A * B]
-	   | List S2 => Void
+	   | S2 * T2 => (TEq [S] [S2]) * (TEq [T] [T2])
+           | List S2 => Void
 	   end
  | List S => \\ (Y::*) =>
            Typerec TEq2 [Y] :: * of
@@ -137,7 +66,7 @@ let type TEq (X::*) =
 in
 
 // Monoid. I.e. types that we can add.
-// Functions from X -> X can be composed with themselves, which is a
+// Functions : X -> X can be composed with themselves, which is a
 // kind of addition. This is where we use type equality
 let type M (X::*) =
   Typerec M [X] :: * of

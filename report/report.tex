@@ -1239,11 +1239,18 @@ Since to_string has type $\forall \alpha. S[\alpha] \rightarrow str$, if $\alpha
 
 All the code for the current version of Typsy is available at \url{https://github.com/bgrange/independent-work}.
 
-Compile with: \texttt{ocamlbuild -use-ocamlfind main.d.byte}
+Compile with: \texttt{ocamlbuild -use-ocamlfind typsy.d.byte}
 
-Run with: \texttt{./main.d.byte <path-to-source>}
+Run with: \texttt{./typsy.d.byte <path-to-source>}
 
-There are plenty of examples in \texttt{src/test/}.
+There are plenty of examples in \texttt{src/test/}. In particular, there are three examples there of advanced use of Typerec:
+\begin{itemize}
+\item \texttt{show.typ} is almost identical to the \texttt{to_string} example given in this report.
+\item \texttt{eq.typ} defines a type-predicate for equality. Specifically, anything but function types
+can be compared for equality. Then I use equality to write a generic list-lookup function.
+\item \texttt{monoid.typ} defines several auxiliary type operators---including one which compares two types for
+equality---and then defines the monoid type predicate. (A monoid is just a set with an associative operation and
+identity.) This predicate is then used to define a generic plus function. This was only tricky
 
 \subsection{Language Syntax Reference}
 

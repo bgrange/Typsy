@@ -4,4 +4,4 @@
 #require "deriving.syntax"
 
 #directory "_build"
-#load_rec "Main.cma"
+#load_rec "typsy.cma"
