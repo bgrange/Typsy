@@ -1,6 +1,6 @@
 open Common
 module Syn = Syntax  
-open ParsedSyntax
+open Parsed_syntax
 open Util.GenVar
 
 exception Conversion_error of string ;;
@@ -109,7 +109,8 @@ let rec convert (e:exp) : Syn.exp =
   match e with
   | Var v -> Syn.Var v   
   | Constant c -> Syn.Constant c
-  | Op (e1,op,e2) -> Syn.Op (convert e1,op,convert e2)
+  | Unop (op,e') -> Syn.Unop (op, convert e')
+  | Binop (e1,op,e2) -> Syn.Binop (convert e1,op,convert e2)
   | If (e1,e2,e3) -> Syn.If (convert e1,convert e2,convert e3)
   | Pair (e1,e2) -> Syn.Pair (convert e1,convert e2)
   | Fst e' -> Syn.Fst (convert e')

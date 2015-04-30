@@ -1,6 +1,8 @@
 open Common
 
 exception Closure_error
+exception Missing_type
+exception Missing_kind
 
 type kind =
   | TypeK | ArrowK of kind * kind
@@ -29,7 +31,8 @@ type exp =
   (* Basic *)
   | Var of variable   
   | Constant of constant
-  | Op of exp * operator * exp
+  | Unop of unop * exp
+  | Binop of exp * binop * exp
   | If of exp * exp * exp
   
   (* Pairs *)
@@ -61,4 +64,3 @@ type exp =
   | RecClosure of env * tenv * variable * variable * exp
 and env = exp SM.t
 and tenv = typ SM.t
-

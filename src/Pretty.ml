@@ -8,7 +8,11 @@ let string_of_const c =
     | Str s -> s
 
 
-let string_of_op op = 
+let string_of_unop op =
+  match op with
+  | StrLen -> "strlen"
+
+let string_of_binop op = 
   match op with 
     | Plus -> "+" 
     | Minus -> "-" 
@@ -17,10 +21,15 @@ let string_of_op op =
     | Div -> "/" 
     | Less -> "<" 
     | LessEq -> "<="
+    | Gt -> ">"
+    | GtEq -> ">="
     | Eq -> "=="
     | And -> "&&"
     | Or -> "||"
     | Concat -> "++"
+    | CharAt -> "#"
+    | StrEq -> "=s="
+    | BoolEq -> "=b="
 
 let rec string_of_kind k =
   match k with
@@ -29,6 +38,7 @@ let rec string_of_kind k =
                         "(%s -> %s)"
                         (string_of_kind k1)
                         (string_of_kind k2)
+  | NoneK -> "?"
 
 let rec string_of_typ typ =
   match typ with
@@ -53,6 +63,7 @@ let rec string_of_typ typ =
                      v (string_of_kind k) (string_of_typ t)
 
   | TRecT _ -> "<Typecase>"
+  | NoneT -> "?"
 
 (* Printing functions *)		      
 		      
@@ -62,17 +73,23 @@ let precedence e =
   match e with 
     | Constant _ -> 0
     | Var _ -> 0
-    | Op (_,Plus,_) -> 5
-    | Op (_,Minus,_) -> 5
-    | Op (_,Times,_) -> 3
-    | Op (_,Mod,_) -> 2
-    | Op (_,Div,_) -> 3
-    | Op (_,Less,_) -> 7
-    | Op (_,LessEq,_) -> 7
-    | Op (_,Eq,_) -> 7
-    | Op (_,And,_) -> 3
-    | Op (_,Or,_) -> 5
-    | Op (_,Concat,_) -> 7
+    | Binop (_,Plus,_) -> 5
+    | Binop (_,Minus,_) -> 5
+    | Binop (_,Times,_) -> 3
+    | Binop (_,Mod,_) -> 2
+    | Binop (_,Div,_) -> 3
+    | Binop (_,Less,_) -> 7
+    | Binop (_,LessEq,_) -> 7
+    | Binop (_,Gt,_) -> 7
+    | Binop (_,GtEq,_) -> 7
+    | Binop (_,Eq,_) -> 7
+    | Binop (_,And,_) -> 3
+    | Binop (_,Or,_) -> 5
+    | Binop (_,Concat,_) -> 7
+    | Binop (_,CharAt,_) -> 6
+    | Binop (_,StrEq,_) -> 7
+    | Binop (_,BoolEq,_) -> 7
+    | Unop _ -> 1
     | If _ -> max_prec
 
     | Pair _ -> 0
@@ -99,59 +116,47 @@ let rec exp2string prec e =
   let p = precedence e in 
   let s = 
     match e with 
-      | Constant c -> string_of_const c
-      | Op (e1,op,e2) -> 
-          (exp2string p e1) ^ " "^(string_of_op op)^" "^(exp2string prec e2)
-      | Var x -> x
-      | If (e1, e2, e3) -> 
-        "if " ^ (exp2string max_prec e1) ^ 
-        " then " ^ (exp2string max_prec e2) ^ 
-        " else " ^ (exp2string p e3)
-      | Pair (e1, e2) -> 
-	  "(" ^ (exp2string max_prec e1) ^ "," ^ (exp2string max_prec e2)  ^ ")"
-      | Fst e1 ->  "fst " ^ (exp2string p e1)
-      | Snd e1 ->  "snd " ^ (exp2string p e1)
+    | Constant c -> string_of_const c
+    | Unop (op,e') -> (string_of_unop op) ^ " " ^ (exp2string p e')
+    | Binop (e1,op,e2) -> 
+      (exp2string p e1) ^ " "^(string_of_binop op)^" "^(exp2string prec e2)
+    | Var x -> x
+    | If (e1, e2, e3) -> 
+      "if " ^ (exp2string max_prec e1) ^ 
+      " then " ^ (exp2string max_prec e2) ^ 
+      " else " ^ (exp2string p e3)
+    | Pair (e1, e2) -> 
+      "(" ^ (exp2string max_prec e1) ^ "," ^ (exp2string max_prec e2)  ^ ")"
+    | Fst e1 ->  "fst " ^ (exp2string p e1)
+    | Snd e1 ->  "snd " ^ (exp2string p e1)
 
-      | EmptyList _ -> "[]"
-      | Cons (e1,e2) -> (exp2string p e1) ^ "::" ^ (exp2string prec e2) 
-      | Match (e1,e2,hd,tl,e3) -> 
-	  "match " ^ (exp2string max_prec e1) ^ 
-	    " with [] -> " ^ (exp2string max_prec e2) ^ 
-            " | " ^ hd ^ "::" ^ tl ^ " -> " ^ (exp2string p e3)
+    | EmptyList _ -> "[]"
+    | Cons (e1,e2) -> (exp2string p e1) ^ "::" ^ (exp2string prec e2) 
+    | Match (e1,e2,hd,tl,e3) -> 
+      "match " ^ (exp2string max_prec e1) ^ 
+      " with [] -> " ^ (exp2string max_prec e2) ^ 
+      " | " ^ hd ^ "::" ^ tl ^ " -> " ^ (exp2string p e3)
 
-      | Rec (f,x,tx,tbody,body) -> Printf.sprintf
-                                     "rec %s (%s:%s) : %s => %s"
-                                     f x (string_of_typ tx) (string_of_typ tbody)
-                                     (exp2string max_prec body)
-      | Fun (x,t,body) -> Printf.sprintf "fun (%s:%s) => %s" x
-                            (string_of_typ t)
-	                      (exp2string max_prec body)		     		  
-      | App (e1,e2) -> Printf.sprintf "%s %s" (exp2string p e1) (exp2string p e2)
-      | TFun (v,k,body) -> Printf.sprintf "tfun (%s::%s) => %s"
-                               v (string_of_kind k) (exp2string p body)
-      | TRec (f,x,k,t,body) -> Printf.sprintf "trec %s (%s::%s) : %s => %s"
-                                   f x (string_of_kind k) (string_of_typ t)
+    | Rec (f,x,tx,tbody,body) -> Printf.sprintf
+                                   "rec %s (%s:%s) : %s => %s"
+                                   f x (string_of_typ tx) (string_of_typ tbody)
                                    (exp2string max_prec body)
-      | TApp (e',t) -> Printf.sprintf "%s [%s]" (exp2string p e') (string_of_typ t)
-      | Closure _ | RecClosure _ -> "<closure>"
-      | TCase (tyop,alpha,
-                  eint,ebool,estr,evoid,
-                  efun,
-                  epair,
-                  elist) -> "<typecase>"
-(*
-	Printf.sprintf "typecase [%s. %s] %s of\n\
-                        | %s => %s\n\
-                        | %s => %s\n\
-                        | %s => %s\n\
-                        | %s => %s\n\
-                        | %s => %s"
-          v (string_of_typ t) (string_of_typ alpha)
-          (string_of_typ IntT) (exp2string p eint)
-          (string_of_typ BoolT) (exp2string p ebool)
-          (string_of_typ (FunT (VarT a,VarT b))) (exp2string p efun)
-          (string_of_typ (PairT (VarT c,VarT d))) (exp2string p epair)
-          (string_of_typ (ListT (VarT e))) (exp2string p elist) *)
+    | Fun (x,t,body) -> Printf.sprintf "fun (%s:%s) => %s" x
+                          (string_of_typ t)
+	                  (exp2string max_prec body)		     		  
+    | App (e1,e2) -> Printf.sprintf "%s %s" (exp2string p e1) (exp2string p e2)
+    | TFun (v,k,body) -> Printf.sprintf "tfun (%s::%s) => %s"
+                           v (string_of_kind k) (exp2string p body)
+    | TRec (f,x,k,t,body) -> Printf.sprintf "trec %s (%s::%s) : %s => %s"
+                               f x (string_of_kind k) (string_of_typ t)
+                               (exp2string max_prec body)
+    | TApp (e',t) -> Printf.sprintf "%s [%s]" (exp2string p e') (string_of_typ t)
+    | Closure _ | RecClosure _ -> "<closure>"
+    | TCase (tyop,alpha,
+             eint,ebool,estr,evoid,
+             efun,
+             epair,
+             elist) -> "<typecase>"
   in 
   if p > prec then "(" ^ s ^ ")" else s
 

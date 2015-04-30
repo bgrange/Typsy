@@ -1,7 +1,7 @@
 (* Main program:  runs our tests *)
 
 open Core.Std
-open ParseEval   ;;
+open Parse_eval   ;;
 
 let default_file = "test/tfun.myml" ;;
 
@@ -12,8 +12,8 @@ let do_it file_opt debug () =
     | Some file -> file
   in
   let eval = if debug
-    then ParseEval.debug_eval_file
-    else ParseEval.eval_file
+    then debug_eval_file
+    else eval_file
   in
   ignore (eval f)
 ;;    

@@ -86,7 +86,8 @@ let transform
     let e' =
       match e with
       | Var _ | Constant _ -> e
-      | Op (e1,op,e2) -> Op (aux s' e1,op,aux s' e2)
+      | Binop (e1,op,e2) -> Binop (aux s' e1,op,aux s' e2)
+      | Unop (op,e) -> Unop (op, aux s' e)
       | If (e1,e2,e3) -> If (aux s' e1,aux s' e2, aux s' e3)
       | Pair (e1,e2) -> Pair (aux s' e1, aux s' e2)
       | Fst e1 -> Fst (aux s' e1)
@@ -132,7 +133,8 @@ let fold
       let s' = update s e in
       let xs = 
         (match e with
-         | Op (e1,op,e2) -> [aux s' e1;aux s' e2]
+         | Binop (e1,op,e2) -> [aux s' e1;aux s' e2]
+         | Unop (op,e) -> [aux s' e]
          | If (e1,e2,e3) -> [aux s' e1;aux s' e2;aux s' e3]
          | Pair (e1,e2) -> [aux s' e1;aux s' e2]
          | Fst e1 -> [aux s' e1]
@@ -257,9 +259,10 @@ let free_vars (e:exp) : SS.t =
       Var x ->
         if SS.mem x bound then SS.empty else SS.singleton x
     | Constant _ -> SS.empty
-    | Op (e1,op,e2) ->
+    | Binop (e1,op,e2) ->
         SS.union (aux e1 bound)
-                 (aux e2 bound)
+          (aux e2 bound)
+    | Unop (op,e) -> aux e bound
     | If (e1,e2,e3) ->
         SS.union (SS.union (aux e1 bound)
                            (aux e2 bound))
@@ -297,6 +300,8 @@ let free_vars (e:exp) : SS.t =
         
   in aux e SS.empty
 ;;
+
+exception BadTypecase
 
 let rec normalize_type (t:typ) : typ =
   match t with
@@ -343,7 +348,8 @@ let rec normalize_type (t:typ) : typ =
 
      | ListT a -> normalize_type (TAppT (TAppT (tlist,a), typecase_of a))
      | VarT _ | TAppT _ | TRecT _ -> typecase_of alpha 
-     | ForallT _ | NoneT  -> raise (Failure "bad Typecase"))
+     | ForallT _ | TFunT _ -> raise BadTypecase
+     | NoneT -> raise Missing_type)
 
 
 let rec typ_eq t u =

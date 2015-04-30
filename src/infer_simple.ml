@@ -8,7 +8,7 @@ type context = (variable * typ) list
 (* Indicates that the two types should unify *)				
 type type_constraint = typ * typ
 				
-let op_type (op:operator) : typ =
+let op_type (op:binop) : typ =
   match op with
   | Plus | Minus | Times | Div | Mod -> IntT
   | Less | LessEq -> BoolT
@@ -35,7 +35,7 @@ let accum_type_vars_in_exp (e:exp) : SS.t =
     match e with
     | Var _ | Constant _ -> []
     | Fst e1 | Snd e1 -> get_list e1			      
-    | Op (e1,_,e2) | Pair (e1,e2)
+    | Binop (e1,_,e2) | Pair (e1,e2)
     | Cons (e1,e2) | App (e1,e2) -> (get_list e1) @ (get_list e2)
     | If (e1,e2,e3) -> (get_list e1) @ (get_list e2) @ (get_list e3)
     | Let (_,e1,e2) -> (get_list e1) @ (get_list e2)
@@ -62,7 +62,7 @@ let rec sub_in_typ (t:typ) (map:typ SM.t) : typ =
 let rec sub_in_exp (e:exp) (map:typ SM.t) : exp =
   match e with
   | Var _ | Constant _ -> e
-  | Op (e1,op,e2) -> Op (sub_in_exp e1 map, op, sub_in_exp e2 map)
+  | Binop (e1,op,e2) -> Binop (sub_in_exp e1 map, op, sub_in_exp e2 map)
   | If (e1,e2,e3) -> If (sub_in_exp e1 map,
 			 sub_in_exp e2 map,
 			 sub_in_exp e3 map)
@@ -102,7 +102,7 @@ let rec typeof_ (ctx : context) (e : exp) (id:int) :
       (match c with
        | Int n -> (IntT, [], id)
        | Bool b -> (BoolT, [], id))
-  | Op (e1,op,e2) ->
+  | Binop (e1,op,e2) ->
      let (e1_typ, cs1, id')  = typeof_ ctx e1 id in
      let (e2_typ, cs2, id'') = typeof_ ctx e2 id' in
      let cs = (e1_typ,IntT)::(e2_typ,IntT)::(cs1 @ cs2) in
@@ -209,7 +209,7 @@ let map =
     Rec ("mapf", "l", VarT "'c", VarT "'d",
       Match (Var "l",
                     EmptyList (VarT "'e"),
-        "hd", "tl", Cons (Op (App (Var "f", Var "hd"), Plus, Constant (Int 1)),
+        "hd", "tl", Cons (Binop (App (Var "f", Var "hd"), Plus, Constant (Int 1)),
                           App (Var "mapf", Var "tl")))))
 
 let t,cs = typeof map ;;

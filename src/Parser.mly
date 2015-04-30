@@ -2,7 +2,7 @@
 
 open Common
 open Lexing
-open ParsedSyntax
+open Parsed_syntax
 
 let to_typ (t_opt:typ option) : typ =
   match t_opt with
@@ -57,7 +57,12 @@ let to_kind (k_opt:kind option) : kind =
 %token LESS
 %token LESSEQ
 %token EQ
-%nonassoc LESS LESSEQ EQ
+%token STREQ
+%token BOOLEQ
+%token CHAR_AT
+%token GT
+%token GTEQ
+%nonassoc LESS LESSEQ EQ GT GTEQ CHAR_AT STREQ BOOLEQ
 %token AND
 %token OR
 %left OR
@@ -80,8 +85,9 @@ let to_kind (k_opt:kind option) : kind =
 %token STR_TYP
 %token VOID_TYP
 %token TYPE
-%start <ParsedSyntax.exp> parse_exp
-%start <ParsedSyntax.typ> parse_typ
+%token STRLEN
+%start <Parsed_syntax.exp> parse_exp
+%start <Parsed_syntax.typ> parse_typ
 %%
 
 
@@ -186,17 +192,22 @@ exp:
     
             
 exp2:
-        | e1 = exp2; PLUS ; e2 = exp2     { Op (e1, Plus, e2) }
-        | e1 = exp2; MOD; e2 = exp2       { Op (e1,Mod,e2) }            
-        | e1 = exp2; CONCAT; e2 = exp2    { Op (e1, Concat, e2) }  
-        | e1 = exp2; MINUS ; e2 = exp2    { Op (e1, Minus, e2) }
-        | e1 = exp2; DIV ; e2 = exp2      { Op (e1, Div, e2) }
-        | e1 = exp2; STAR ; e2 = exp2  { Op (e1, Times, e2) }        
-        | e1 = exp2; LESS ; e2 = exp2     { Op (e1, Less, e2) }
-        | e1 = exp2; LESSEQ ; e2 = exp2   { Op (e1, LessEq, e2) }
-        | e1 = exp2; EQ; e2 = exp2        { Op (e1, Eq, e2) }                        
-        | e1 = exp2; AND ; e2 = exp2      { Op (e1, And, e2) }
-        | e1 = exp2; OR ; e2 = exp2       { Op (e1, Or, e2) }                        
+        | e1 = exp2; PLUS ; e2 = exp2     { Binop (e1, Plus, e2) }
+        | e1 = exp2; MOD; e2 = exp2       { Binop (e1,Mod,e2) }            
+        | e1 = exp2; CONCAT; e2 = exp2    { Binop (e1, Concat, e2) }  
+        | e1 = exp2; MINUS ; e2 = exp2    { Binop (e1, Minus, e2) }
+        | e1 = exp2; DIV ; e2 = exp2      { Binop (e1, Div, e2) }
+        | e1 = exp2; STAR ; e2 = exp2  { Binop (e1, Times, e2) }        
+        | e1 = exp2; LESS ; e2 = exp2     { Binop (e1, Less, e2) }
+        | e1 = exp2; LESSEQ ; e2 = exp2   { Binop (e1, LessEq, e2) }
+        | e1 = exp2; GT; e2 = exp2        { Binop (e1, Gt, e2) }
+        | e1 = exp2; GTEQ; e2 = exp2      { Binop (e1, GtEq, e2) }
+        | e1 = exp2; CHAR_AT ; e2 = exp2  { Binop (e1, CharAt, e2) } 
+        | e1 = exp2; EQ; e2 = exp2        { Binop (e1, Eq, e2) }
+        | e1 = exp2; STREQ ; e2 = exp2     { Binop (e1, StrEq, e2) }
+        | e1 = exp2; BOOLEQ ; e2 = exp2   { Binop (e1, BoolEq, e2) }
+        | e1 = exp2; AND ; e2 = exp2      { Binop (e1, And, e2) }
+        | e1 = exp2; OR ; e2 = exp2       { Binop (e1, Or, e2) }                        
         | e1 = exp2; COMMA; e2 = exp2     { Pair (e1,e2) }
         | e1 = exp2; DOUBLE_COLON; e2 = exp2;     { Cons (e1,e2) }
         | e = exp3                      { e }                                      
@@ -205,8 +216,8 @@ exp2:
 
 exp3:
         | f = exp3; args = exp4;         { App (f,args) }
-        | e = exp3; t = type_arg
-                                        { TApp (e,t) }
+        | e = exp3; t = type_arg         { TApp (e,t) }
+        | STRLEN; e = exp4               { Unop (StrLen, e) }                                              
         | FST; e = exp4                  { Fst e }
         | SND; e = exp4                  { Snd e }
         | e = exp4                      { e }

@@ -33,10 +33,10 @@ let parse parse_fun filename =
   ret
 ;;
 
-let parse_exp filename : ParsedSyntax.exp =
+let parse_exp filename : Parsed_syntax.exp =
   parse Parser.parse_exp filename
 
-let parse_typ filename : ParsedSyntax.typ =
+let parse_typ filename : Parsed_syntax.typ =
   parse Parser.parse_typ filename
 
 let eval_file filename =
@@ -45,14 +45,14 @@ let eval_file filename =
   let typed_exp = Infer.infer exp in
   let _ = Typecheck.typeof typed_exp in
   let evald = Eval.eval typed_exp in
-  print_endline ("eval'd expression:\n" ^ (Pretty.string_of_exp evald)) ;
+  print_endline ("result:\n" ^ (Pretty.string_of_exp evald)) ;
   evald
   
 ;;
 
 let debug_eval_file filename =
   let parsed_exp = parse_exp filename in
-  print_endline ("parsed expression:\n" ^ (Show.show<ParsedSyntax.exp> parsed_exp)) ;
+  print_endline ("parsed expression:\n" ^ (Show.show<Parsed_syntax.exp> parsed_exp)) ;
   let exp = Convert.convert parsed_exp in
   let typed_exp = Infer.infer exp in
   print_endline ("typed expression:\n" ^ (Pretty.string_of_exp typed_exp)) ;

@@ -36,7 +36,8 @@ type exp =
   (* Basic *)
   | Var of variable   
   | Constant of constant
-  | Op of exp * operator * exp
+  | Unop of unop * exp
+  | Binop of exp * binop * exp
   | If of exp * exp * exp
   
   (* Pairs *)

@@ -61,6 +61,11 @@ rule read =
        | '%'      { MOD }          
        | '<'      { LESS }
        | "=="     { EQ }
+       | "=s="    { STREQ }
+       | "=b="    { BOOLEQ } 
+       | '>'      { GT }
+       | ">="     { GTEQ }
+       | '#'      { CHAR_AT }
        | "&&"     { AND }
        | "||"     { OR }
        | "<="     { LESSEQ }
@@ -70,6 +75,7 @@ rule read =
        | "Typerec"    { TRECT }
        | "fst"    { FST }
        | "snd"    { SND }
+       | "strlen" { STRLEN }        
        | id       { ID (Lexing.lexeme lexbuf) }
        | typ_id   { TYP_ID (Lexing.lexeme lexbuf) }
        | ','      { COMMA }
@@ -86,6 +92,7 @@ and read_string buf =
 | '\\' 'n'  { Buffer.add_char buf '\n'; read_string buf lexbuf }
 | '\\' 'r'  { Buffer.add_char buf '\r'; read_string buf lexbuf }
 | '\\' 't'  { Buffer.add_char buf '\t'; read_string buf lexbuf }
+| '\\' '"'  { Buffer.add_char buf '"'; read_string buf lexbuf }
 | [^ '"' '\\']+
   { Buffer.add_string buf (Lexing.lexeme lexbuf);
     read_string buf lexbuf

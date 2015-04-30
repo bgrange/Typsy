@@ -295,17 +295,17 @@ exp:
     
             
 exp2:
-        | e1 = exp2; PLUS ; e2 = exp2     { Op (e1, Plus, e2) }
-        | e1 = exp2; MOD; e2 = exp2       { Op (e1,Mod,e2) }            
-        | e1 = exp2; CONCAT; e2 = exp2    { Op (e1, Concat, e2) }  
-        | e1 = exp2; MINUS ; e2 = exp2    { Op (e1, Minus, e2) }
-        | e1 = exp2; DIV ; e2 = exp2      { Op (e1, Div, e2) }
-        | e1 = exp2; STAR ; e2 = exp2  { Op (e1, Times, e2) }        
-        | e1 = exp2; LESS ; e2 = exp2     { Op (e1, Less, e2) }
-        | e1 = exp2; LESSEQ ; e2 = exp2   { Op (e1, LessEq, e2) }
-        | e1 = exp2; EQ; e2 = exp2        { Op (e1, Eq, e2) }                        
-        | e1 = exp2; AND ; e2 = exp2      { Op (e1, And, e2) }
-        | e1 = exp2; OR ; e2 = exp2       { Op (e1, Or, e2) }                        
+        | e1 = exp2; PLUS ; e2 = exp2     { Binop (e1, Plus, e2) }
+        | e1 = exp2; MOD; e2 = exp2       { Binop (e1,Mod,e2) }            
+        | e1 = exp2; CONCAT; e2 = exp2    { Binop (e1, Concat, e2) }  
+        | e1 = exp2; MINUS ; e2 = exp2    { Binop (e1, Minus, e2) }
+        | e1 = exp2; DIV ; e2 = exp2      { Binop (e1, Div, e2) }
+        | e1 = exp2; STAR ; e2 = exp2  { Binop (e1, Times, e2) }        
+        | e1 = exp2; LESS ; e2 = exp2     { Binop (e1, Less, e2) }
+        | e1 = exp2; LESSEQ ; e2 = exp2   { Binop (e1, LessEq, e2) }
+        | e1 = exp2; EQ; e2 = exp2        { Binop (e1, Eq, e2) }                        
+        | e1 = exp2; AND ; e2 = exp2      { Binop (e1, And, e2) }
+        | e1 = exp2; OR ; e2 = exp2       { Binop (e1, Or, e2) }                        
         | e1 = exp2; COMMA; e2 = exp2     { Pair (e1,e2) }
         | e1 = exp2; DOUBLE_COLON; e2 = exp2;     { Cons (e1,e2) }
         | e = exp3                      { e }                                      

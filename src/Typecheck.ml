@@ -50,7 +50,8 @@ let rec kindof_ (ctx : kind SM.t) (t:typ) =
      | TypeK -> mismatchk' "arrow" k1
      | ArrowK (k11,k12) ->
        expectk k11 k2;
-       k12)
+       k12
+     | NoneK -> raise Missing_kind)
   | TRecT (alpha,tint,tbool,tstr,tvoid,
             tfun,tpair,tlist) ->
     expectk TypeK (kindof_ ctx alpha) ;
@@ -65,16 +66,25 @@ let rec kindof_ (ctx : kind SM.t) (t:typ) =
     expectk star_star_k_k_k (kindof_ ctx tpair) ;
     expectk star_k_k (kindof_ ctx tlist) ;
     k
+  | NoneT -> raise Missing_type
     
 let kindof t = kindof_ SM.empty t
-				
-let op_type (op:operator) : typ =
+
+
+let binop_type (op:binop) : typ =
   match op with
   | Plus | Minus | Times | Div | Mod ->
 			    FunT (IntT, FunT (IntT, IntT))
-  | Eq | Less | LessEq -> FunT (IntT, FunT (IntT, BoolT))
+  | Eq | Less | LessEq | Gt | GtEq -> FunT (IntT, FunT (IntT, BoolT))
   | And | Or -> FunT (BoolT, FunT (BoolT, BoolT))
   | Concat -> FunT (StrT, (FunT (StrT, StrT)))
+  | CharAt -> FunT (StrT, FunT (IntT,StrT))
+  | StrEq -> FunT (StrT, FunT (StrT,BoolT))
+  | BoolEq -> FunT (BoolT, FunT (BoolT,BoolT))
+
+let unop_type (op:unop) : typ =
+  match op with
+  | StrLen -> FunT (StrT, IntT)
 
 
 let rec is_polytype (t:typ) : bool =
@@ -113,15 +123,21 @@ let rec typeof_ (ctx : typ SM.t) (tctx : kind SM.t) (e : exp) : typ =
        | Int n -> IntT
        | Bool b -> BoolT
        | Str s -> StrT)
-  | Op (e1,op,e2) ->
+  | Binop (e1,op,e2) ->
      let e1_typ = typeof_ ctx tctx e1 in
      let e2_typ = typeof_ ctx tctx e2 in
-     let opt = op_type op in
+     let opt = binop_type op in
      (match opt with
       | FunT (t1,FunT(t2,t3)) ->
 	 expect e1_typ t1 ; expect e2_typ t2 ;
 	 t3
-      | _ -> mismatch' "binary operator" opt)
+      | _ -> mismatch' "binary operator type" opt)
+  | Unop (op,e') ->
+    let e'_typ = typeof_ ctx tctx e in
+    let optyp = unop_type op in
+    (match optyp with
+     | FunT (t1,t2) -> expect e'_typ t1; t2
+     | _ -> mismatch' "unary operator type" optyp)
   | If (cond,e1,e2) ->
      let cond_typ = typeof_ ctx tctx cond in
      let e1_typ = typeof_ ctx tctx e1 in
@@ -248,43 +264,9 @@ let rec typeof_ (ctx : typ SM.t) (tctx : kind SM.t) (e : exp) : typ =
     expect
       (ForallT ("v",TypeK,apply_op (ListT (VarT "v"))))
       tlist ;
-
     apply_op alpha
-    
-    (*
-  | TCase ((v,t),alpha,
-              eint,ebool,estr,
-              a,b,efun,
-              c,d,epair,
-              u,elist) ->
 
-    let t = normalize_type t in
-    
-    let tbool = Util.sub_in_typ t v BoolT in
-    let ebool_typ = typeof_ ctx tctx ebool in
-    expect tbool ebool_typ ;
-
-    let tint = Util.sub_in_typ t v IntT in
-    let eint_typ = typeof_ ctx tctx eint in
-    expect tint eint_typ ;
-
-    let tfun = Util.sub_in_typ t v (FunT(VarT a,VarT b)) in
-    let tctx' = SM.add b () (SM.add a () tctx) in
-    let efun_typ = typeof_ ctx tctx' efun in
-    expect tfun efun_typ ;
-
-    let tpair = Util.sub_in_typ t v (PairT(VarT c,VarT d)) in
-    let tctx' = SM.add d () (SM.add c () tctx) in
-    let epair_typ = typeof_ ctx tctx' epair in
-    expect tpair epair_typ ;
-
-    let tlist = Util.sub_in_typ t v (ListT (VarT u)) in
-    let tctx' = SM.add u () tctx in
-    let elist_typ = typeof_ ctx tctx' elist in
-    expect tlist elist_typ ;
-
-    Util.sub_in_typ t v alpha*)
-  | Closure _ | RecClosure _ -> raise (Type_error "can't typecheck a closure")
+  | Closure _ | RecClosure _ -> raise Closure_error
        
 let typeof (e:exp) = typeof_ SM.empty SM.empty e
 			     
