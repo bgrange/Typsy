@@ -1,7 +1,7 @@
 \documentclass[pageno]{jpaper}
 
 %replace XXX with the submission number you are given from the ISCA submission site.
-\newcommand{\IWreport}{2012}
+\newcommand{\IWreport}{2015}
 \newcommand{\step}{\longrightarrow}
 \newcommand{\bstep}{\Downarrow}
 
@@ -15,6 +15,8 @@
 %\usepackage{easy-todo}
 \usepackage{color}
 \usepackage{placeins}
+\usepackage{stackengine}
+
 
 \begin{document}
 
@@ -25,7 +27,8 @@
   breakatwhitespace=false,         % sets if automatic breaks should only happen at whitespace
   breaklines=true,                 % sets automatic line breaking
   captionpos=b,                    % sets the caption-position to bottom
-  commentstyle=\color{green},    % comment style
+  %commentstyle=\color{green},    % comment style
+  commentstyle=\ttfamily,
   deletekeywords={...},            % if you want to delete keywords from the given language
   escapeinside={\%*}{*)},          % if you want to add LaTeX within your code
   extendedchars=true,              % lets you use non-ASCII characters; for 8-bits encodings only, does not work with UTF-8
@@ -63,35 +66,15 @@
 
 \section{Introduction}
 
-\section{Notation}
+In this paper, I describe the development of a programming language with a sophisticated type system.
+Starting from the untyped lambda calculus, I add simple types, parametric polymorphism, type operators,
+and finally the Typerec construct. These features allow us to encode Haskell typeclasses in an elegant way.
 
-\subsection{Inference rules}
-Throughout this paper, I'll be using a simple notation for expressing relations and their inference rules.
-Suppose we wanted to define the less-than-or-equal-to ($\leq$) relation on $\mathbb{N}$.
-This relation is infinite,
-so we can't describe it just by listing all the pairs of numbers that satisfy it.
-We instead describe the relation with a list of axioms and inference rules. So, we can say that
-forall $n$, $n \leq n$; and we can say that if $n \leq m$ then $n \leq m+1$. These two rules fully express the $\leq$ relation.
-The Gentzen notation for these rules is:
-
-\begin{prooftree}
-\AxiomC{}
-\UnaryInfC{$n \leq n$}
-\end{prooftree}
-
-\begin{prooftree}
-\AxiomC{$n \leq m$}
-\UnaryInfC{$n \leq m+1$}
-\end{prooftree}
-
-So to write down an inference rule, we put our assumptions above the line (and there may be more than one,
-separated by spaces), and our conclusion (usually just one) below the line.
 
 \section{Untyped Lambda Calculus}
-While the Turing machine is the model of computation that gets the most press,
-and intuitively corresponds to the low-level behavior of computers, it is really messy,
-and hence difficult to reason about. It is not really suitable as a model of the
-semantics of high level programming languages.
+While the Turing machine is the model of computation that gets the most popular attention,
+and intuitively corresponds to the low-level behavior of computers, it is messy
+and difficult to reason about.
 
 The most natural and elegant way to model high level programming languages is
 with various kinds of of lambda calculi, which are a collection of logical systems
@@ -201,10 +184,10 @@ We just need something called a fixpoint-combinator.  I won't go into detail abo
 combinator works.  The important point is that we don't need any extra constructs to implement recursion---a
 property which won't hold for later systems.
 
-\subsection{Implementation}
-There are two points worth mentioning here about implementation, because they will still be relevant when
-discussing more complicated systems.
-First, it is more efficient (and maybe more elegant) to be lazy in our performance of substitutions.
+\subsection{Environment-based Evaluation}
+%There are two points worth mentioning here about implementation, because they will still be relevant when
+%discussing more complicated systems.
+It is more efficient (and maybe more elegant) to be lazy in our performance of substitutions.
 Rather than carry them out fully right away, we can keep track of them in an \textit{environment}
 and apply them as needed.  Basically, an environment is a set of deferred substitutions, and it can
 be represented by a mapping from variables to values (they will always be values,
@@ -217,13 +200,15 @@ In my code, I use OCaml maps to represent environments.
 type env = exp Map.Make(String).t
 \end{lstlisting}
 
-The other point is that it is impractical to implement a programming language by simply transcribing the
-small-step semantics into an interpreter. Such an implementation would have to traverse all the way down
-to the bottom of an expression for each step of evaluation, resulting in many traversals in total.
-There is another style of expressing operational semantics which is better suited to being transcribed
-into a working implementation: big-step semantics.  While the $\step$ relation tells us what an expression
-reduces to in a single computation step, the big-step $\bstep$ relation tells us what an expression
-reduces to when fully evaluated.
+The other change we need to make in this case is to introduce closures.
+
+%The other point is that it is impractical to implement a programming language by simply transcribing the
+%small-step semantics into an interpreter. Such an implementation would have to traverse all the way down
+%to the bottom of an expression for each step of evaluation, resulting in many traversals in total.
+%There is another style of expressing operational semantics which is better suited to being transcribed
+%into a working implementation: big-step semantics.  While the $\step$ relation tells us what an expression
+%reduces to in a single computation step, the big-step $\bstep$ relation tells us what an expression
+%reduces to when fully evaluated.
 
 \section{Simple Types (STLC)}
 Although this simple system is Turing-complete and we can encode numbers and booleans and operations on them in it, such encodings aren't particularly efficient.
@@ -426,9 +411,7 @@ We have no way of writing well-typed fixed-point combinators, \footnote{For inst
 equal to $\lambda f. (\lambda x. f(x \,  x)) (\lambda x. f(x \, x))$, has a self-application $(x \, x)$
 as a subterm.  But self-application is never well-typed. For if $x$ had a type, it would clearly
 be a function type $T = T_1 \rightarrow T_2$. But by the application typing rule, $T$ must be equal
-to $T_1$. So $T$ must contain itself as a subexpression, which is impossible.} and hence no way of doing general recursion. \footnote{We can write primitive recursive functions in STLC.}
-
-MAYBE MENTION FIX vs REC
+to $T_1$. So $T$ must contain itself as a subexpression, which is impossible.} and hence no way of doing general recursion.
 
 So to endow our language with Turing-completeness once again, we have to add a new primitive.
 In my implementation, there is a \lsti{Rec} constructor which is basically a named $\lambda$.
@@ -439,7 +422,7 @@ The evaluation rule might look like this:
 
 \begin{prooftree}
 \AxiomC{}
-\UnaryInfC{$(rec f x. e) v \step [x \mapsto v][f \mapsto rec f x. e]e$}
+\UnaryInfC{$(rec \ f x. e) v \step [x \mapsto v][f \mapsto rec \ f x. e]e$}
 \end{prooftree}
 
 \subsection{Other types}
@@ -449,7 +432,7 @@ Once we have this infrastructure set up, it's pretty easy to add new types, such
 \item Pairs have $fst$ and $snd$ operators for getting the first and second components respectively.
 \item Lists are constructed with $nil$ and the $cons$ operator, and destructed with $match$ statements.
 \item I add a placeholder type \lsti{NoneT}, which represents some unknown type that the user
-left out of their code. Almost all functional
+neglected to annotate. Almost all functional
 programming languages have type-inference, whereby the compiler can determine the types of terms that
 are unannotated. So the idea is that, using type-inference, all the \lsti{NoneT} types will be filled
 in with actual types. \footnote{I implemented type inference for STLC, but not for the full system. Currently,
@@ -515,12 +498,11 @@ Up until this point, the language was simple enough that it was possible to deve
 
 The tools I chose to use
 are ocamllex and menhir, which are lexer and parser generators, respectively.
-The lexer generated by ocamllex produces a stream of tokens to be parsed into an AST by the parser, which is
-in turn generated by menhir.
+The lexer generates a stream of tokens which is then parsed into an AST by the parser.
 
-Using ocamllex is really straightforward. Almost all of the tokens could be recognized by simple regular
+Using ocamllex is really straightforward. Most kinds of tokens can be recognized by simple regular
 expressions.
-Using menhir was somewhat more involved. Menhir and parser generators like it---yacc, ocamlyacc, bison, etc---take as input a description of a language in the form of a BNF grammar, which is basically a set of rules
+Using menhir is somewhat more involved. Menhir and parser generators like it---yacc, ocamlyacc, bison, etc---take as input a description of a language in the form of a BNF grammar, which is basically a set of rules
 for recognizing valid expressions.  In a BNF grammar, there's a set of terminal symbols, or tokens, which are the simple units
 of the language.  For instance \lsti{->}, \lsti{x}, \lsti{fun}, and \lsti{+} are
 examples of tokens (generated by the lexer). In Menhir, terminal symbols/tokens are declared with the \lsti{%token} keyword, and their names should match up with the tokens produced by the lexer.
@@ -528,7 +510,7 @@ examples of tokens (generated by the lexer). In Menhir, terminal symbols/tokens 
 The nonterminal symbols are the complex expressions built up
 out of tokens.  In this case, the primary nonterminal symbols are \lsti{exp} and \lsti{typ}, in
 addition to a number of auxiliary nonterminals. Each nonterminal symbol has a set of alternative ways it can be matched. For instance, the \lsti{exp} nonterminal can be matched by something of the form
-\lsti{<exp> + <exp>}, or by something of the form \lsti{fun <id> => <exp>}, and so forth. The alternatives are separated by vertical bars. Thus, the syntax and semantics of BNF grammars are very much like
+\lsti{<exp> + <exp>}, or by something of the form \lsti{\ <id> => <exp>}, and so forth. The alternatives are separated by vertical bars. Thus, the syntax and semantics of BNF grammars are very much like
 the syntax and semantics of algebraic datatypes.
 
 Note also that, since we don't just want to \textit{recognize} a language---we also want to generate
@@ -575,10 +557,10 @@ a scary number of ``shift-reduce'' errors, indicating grammar ambiguities.
 There are a few kinds of ambiguities involved here
 \begin{itemize}
 \item Arithmetic expressions. For instance \lsti{3 + 4 * 7} is ambiguous in the current grammar
-\item Function application. In \lsti{(fun x:int => x) 5 + 3}, which has higher precedence, function
+\item Function application. In \lsti{(\ (x:int) => x) 5 + 3}, which has higher precedence, function
       application, or addition?
-\item Other ambiguities.  For example, \lsti{fun x:int => x + 1} could be parsed as
-      \lsti{(fun x:int => x) + 1} or as \lsti{fun x:int => (x + 1)}.  Although it's obvious to us
+\item Other ambiguities.  For example, \lsti{\ (x:int) => x + 1} could be parsed as
+      \lsti{(\ (x:int) => x) + 1} or as \lsti{\ (x:int) => (x + 1)}.  Although it's obvious to us
       which of these is intended, this is only because of our mental typechecking.  The parser doesn't know
       about types, so as far as it knows, a function can be added to an integer.
 \end{itemize}
@@ -637,10 +619,10 @@ The actual syntax transformations aren't terribly complicated.
 There are two main operations that happen:
 \begin{itemize}
 \item Getting rid of \lsti{let} expressions, by turning them into function applications.
-An expression like \lsti{let x:int = 5 in x + 24} wil turn into \lsti{(fun x:int => x + 24) 5}.
+An expression like \lsti{let x:int = 5 in x + 24} wil turn into \lsti{(\ (x:int) => x + 24) 5}.
 \item ``Currying'' multi-argument functions by turning them into nested, single-argument functions.
-An expression like \lsti{fun (x:int) (y:int) (z:int) => x + y + z} will be curried into
-\lsti{fun (x:int) => fun (y:int) => fun (z:int) => x + y + z}.
+An expression like \lsti{\ (x:int) (y:int) (z:int) => x + y + z} will be curried into
+\lsti{\ (x:int) => \ (y:int) => \ (z:int) => x + y + z}.
 \item We can also convert more complex \lsti{let} expressions.
 For instance, given the expression 
 
@@ -653,7 +635,7 @@ we first notice that this is equivalent to
 
 \begin{lstlisting}
   let f : int -> int -> int =
-      (fun (x:int) (y:int) => x + y)
+      (\ (x:int) (y:int) => x + y)
   in
   f 73 5
 \end{lstlisting}
@@ -664,8 +646,8 @@ Then we can curry the definition of \lsti{f}, and transform the \lsti{let} as ab
 the final expression:
 
 \begin{lstlisting}
-  (fun (f:int->int->int) => f 73 5)
-    (fun (x:int) (fun (y:int) => x + y))
+  (\ (f:int->int->int) => f 73 5)
+    (\ (x:int) (\ (y:int) => x + y))
 \end{lstlisting}
 \end{itemize}
 
@@ -680,22 +662,21 @@ Possible solutions to this issue are:
 can be determined from the context in which it's used. So in the expression,
 
 \begin{lstlisting}
-  (fun f => f 73 5)
-    (fun (x:int) (fun (y:int) => x + y))
+  (\ f => f 73 5)
+    (\ (x:int) (\ (y:int) => x + y))
 \end{lstlisting}
 
 the type inference algorithm would figure out that \lsti{f} must have type \lsti{int->int->int} because
-\lsti{(fun (x:int) (fun (y:int) => x + y))} has type \lsti{int->int->int}.
+\lsti{(\ (x:int) (\ (y:int) => x + y))} has type \lsti{int->int->int}.
 \item Simply allow \lsti{let} expressions in the target language.  Then the type of \lsti{f} could
 just be determined from the type of its definition. I chose not to do this because I want to keep the
 target language as simple as possible, and because type-inference is a something I'd like to try long-term
 anyway.
 
-\item Run the typechecker during the syntax transformation process. So, given an unannotated \lsti{let}
-like \lsti{let x = 5 in x + 24}, we'd first get the type of the definition of \lsti{x} (namely \lsti{int})
-before desugaring the \lsti{let} into \lsti{fun (x:int) => x + 24) 5}. I chose not to do this because, again I plan at some point to implement type inference
-anyway, and also, it seems much cleaner to me if there is a separation between the desugaring phase an the
-typechecking phase.
+%\item Run the typechecker during the syntax transformation process. So, given an unannotated \lsti{let}
+%like \lsti{let x = 5 in x + 24}, we'd first get the type of the definition of \lsti{x} (namely \lsti{int})
+%before desugaring the \lsti{let} into \lsti{(\ (x:int) => x + 24) 5}. This would actually be a cumbersome
+%change to make, however: I'd have to keep track of 
 \end{itemize}
 
 \section{typecase, Typecase, and Typeclass}
@@ -755,7 +736,7 @@ module ListEq(ElemEq:Eq) : (Eq with t = ElemEq.t list)
 struct
   type t = ElemEq.t list
   let (==) l1 l2 =
-    List.for_all2 (fun x1 x2 -> ElemEq.(==) x1 x2) l1 l2
+    List.for_all2 (\ x1 x2 -> ElemEq.(==) x1 x2) l1 l2
 end
 
 type 'a tree = Leaf | Node of 'a * ('a tree) * ('a tree)
@@ -775,7 +756,7 @@ end
 However, there is a significant advantage of typeclasses over modules in terms of convenience/brevity.
 In both definitions here, to call the equality function on the elements of the trees/lists,
 we have to call \lsti{ElemEq.(==)}. And we can't just open the \lsti{ElemEq} module, because
-\lsti{ElemEq.(==)} would then clash with the \lsti{==} we're trying to define!
+\lsti{ElemEq.(==)} would then clash with the \lsti{==} we're trying to define.
 
 Similarly, when using our newly defined eqality functions, we can't mix calls to \lsti{tree} equality
 and \lsti{list} equality, again because of name clashing. In fact, we can't even mix calls to
@@ -794,7 +775,7 @@ of typeclasses that we need to capture. First is ad-hoc polymorphism---that is, 
 The second is partiality: the ability to define a function on some limited set of types, such that if it's called on a type outside of this set, \textit{it won't typecheck}.
 
 Typeclasses in GHC/Haskell are implemented with ``dictionary-passing'', but I'll take the approach described
-in Harper and Morrisett instead. This will mean extending the language in a few ways.  First, I'll add the
+in Harper and Morrisett \cite{harper-typecase} instead. This will mean extending the language in a few ways.  First, I'll add the
 \lsti{typecase} construct, which allows us to easily implement ad-hoc polymorphism. Then I'll add
 \textit{type-operators}, and the \lsti{Typecase} (with a capital 'T') construct, which will give us
 partiality.
@@ -807,14 +788,14 @@ The easiest way to explain how it works is by example. Here is a (pretty useless
 
 \begin{lstlisting}[mathescape]
 let to_string = 
-tfun a =>
+/\ a =>
   typecase [t.t -> str] a of
   | int => int2string
   | bool => bool2string
   | str => id [str]
-  | t1 -> t2 => (fun (f:t1 -> t2) => "function" )
-  | t1 * t2 => (fun (p:t1*t2) => "pair")
-  | list t => (fun (l:list t) => "list")
+  | t1 -> t2 => (\ (f:t1 -> t2) => "function" )
+  | t1 * t2 => (\ (p:t1*t2) => "pair")
+  | list t => (\ (l:list t) => "list")
   end
 in
 ...
@@ -829,7 +810,7 @@ Note that we need to bind type variables in evaluating the branches for the comp
 in evaluating \lsti{to_string [int -> bool]}, we need to bind \lsti{t1} to \lsti{int} and \lsti{t2} to \lsti{bool} before we evaluate the branch body. 
 Given this observation, we can make the code a little bit more elegant
 by representing these branches as type functions. So we can represent the function branch by
-\lsti{(tfun t1 t2 => <branch-body>)}, and likewise for the list and pair branches. This transformation
+\lsti{(/\ t1 t2 => <branch-body>)}, and likewise for the list and pair branches. This transformation
 occurs in the \lsti{Convert} module.
 
 The annotation \lsti{[t.t -> str]} basically tells the typechecker that, when applied to type \lsti{t}, the \lsti{typecase} expression will reduce to something of type \lsti{t -> str}. 
@@ -843,7 +824,7 @@ Could we write the following?
 
 \begin{lstlisting}[mathescape]
 let to_string = 
-tfun a => fun (x:a) =>
+/\ a => \ (x:a) =>
   typecase [t.t -> str] a of
   | int => int2string x
   | bool => bool2string x
@@ -875,40 +856,33 @@ The problem is we don't have a recursive type-function construct. We do have nor
 and we could actually achieve the desired effect by doing something like this:
 
 \begin{lstlisting}[mathescape]
-
-
-let to_string =
-rec to_string (dummy:int) : forall a. a -> str =>
-  tfun a =>
+rec \to_string (dummy:int) : forall a. a -> str =>
+  /\ a =>
     typecase [t.t -> str] a of
     | int => int2string
     | bool => bool2string
     | str => id [str]
-    | t1 -> t2 => (fun (f:t1->t2) => "<function>")
-    | t1 * t2 => (fun (p:t1*t2) => 
+    | t1 -> t2 => (\ (f:t1->t2) => "<function>")
+    | t1 * t2 => (\ (p:t1*t2) => 
                     "(" ++ (to_string 53 [t1] (fst p)) ++ "," ++
                            (to_string 19 [t2] (snd p)) ++ ")")
-    | list t => (fun (xs:list t) =>
+    | list t => (\ (xs:list t) =>
                    fold [t] [str] 
-                        (fun (v:t) (acc:str) =>
+                        (\ (v:t) (acc:str) =>
                            (to_string 7 [t] v) ++ acc) "")
     end
-in
-...
 \end{lstlisting}
 
 Here we define a normal recursive function as a wrapper to the code that we actually care about.
-But this is a dirty hack.  We want to be able to recurse directly on the type argument. So I added a \lsti{trec}
+But this is a dirty hack.  We want to be able to recurse directly on the type argument. So I added another \lsti{rec}
 form---completely analogous to the regular \lsti{rec} form---allowing us to write \lsti{to_string} as follows:
 
 \begin{lstlisting}[mathescape]
 
-let to_string =
-trec to_string a : (a -> str) =>
+rec /\ to_string a : (a -> str) =>
     typecase [t.t -> str] a of
     ...
-in
-...
+
 \end{lstlisting}
 
 This differs from Harper and Morrisett's method for doing recursion on types.
@@ -923,11 +897,317 @@ we can implement their method.
 First we need to make a big addition to the typesystem, namely type operators.
 We already have functions taking types as arguments and returning expressions, but a type operator takes
 a type as argument and \textit{also returns a type}.
-Type operators are basically a copy of the lambda calculus one level up.  In the literature, type operators are usually written with the same $\lambda$ syntax as regular term-level functions, and in my language the
-syntax will be 
+Type operators are basically a copy of the lambda calculus one level up.  In the literature, type operators are usually written with the same $\lambda$ syntax as regular term-level functions, but to differentiate it from
+the term-level abstraction, I use a double-slash \lsti{\\} for type operators. As an example, we can define
+a pairing type operator which takes any type and returns the type of pairs of that type:
 
- we add a type \lsti{void} to
-the typesystem, such that nothing can ever be of type \lsti{void}, i.e. \lsti{void} is the empty type.
+\begin{lstlisting}
+\\A => A * A
+\end{lstlisting}
+
+But note that, if we want to treat type operators as ``first-class citizens'', on a par with the types
+we've seen thus far, we should allow type operators to be passed around as arguments and returned by other
+type operators. For example here is an operator that applies its first-argument (itself a type-operator)
+to its second and third aruguments:
+
+\begin{lstlisting}
+\\A B C => A B C
+\end{lstlisting}
+
+Since we've lifted function abstraction from the term-level to the type level, we also now need to lift
+typechecking. For instance, we want to be able to detect that the following type is malformed:
+
+\begin{lstlisting}
+(\\A B C => A B C) [int]
+\end{lstlisting}
+since \lsti{int} is a type that cannot be applied to other types.
+In the same way that we assign each expression a type, we assign each type a kind, and during the
+typechecking phase, we also perform kind-checking. Types like \lsti{int}, \lsti{bool}, and
+\lsti{forall a. a -> a}, we call proper types, and we give them kind \lsti{*} (pronounced ``type'').
+(Expressions (i.e. at the term-level) can only have proper types as their type, i.e. there's no
+expression with type \lsti{\\A => A * A}.)
+
+If \lsti{k1} and  \lsti{k2} are kinds, then we can form a kind \lsti{k1 -> k2}, which is the kind of
+type operators taking arguments of kind \lsti{k1} and returning results of kind \lsti{k2}. So the pairing operator above has kind \lsti{* -> *}.
+
+\subsubsection{Normalization}
+
+With the introduction of type operators, we now have the task of figuring out if two type operators are
+equivalent, for the purpose of typechecking. For instance, given the program
+\begin{lstlisting}
+let x:(\\(T::*) => int) [bool] = 5
+in x + 1
+\end{lstlisting}
+we need to check that \lsti{x}'s type annotation is equivalent to the type of its definition. (It is.)
+Up until now, we could just check for syntactic equality up to renaming of bound variables, but this won't
+suffice anymore as the above example shows.
+
+The basic method to check for type-equivalence between two types \lsti{T1} and \lsti{T2} is to normalize
+both types, and then check for syntactic equality (up to $\alpha$-equivalence).
+What algorithm shall we use to normalize? 
+It is tempting to argue that we can just do repeated $\beta$-reductions until
+it's no longer possible, as we do at the value-level. Specifically, it's tempting to argue that we don't
+have to reduce underneath $\lambda$ type-abstractions. The argument would be that we're only ever checking
+for equivalence between proper types, and therefore, if we have a type-operator, it will be \textit{applied to something}, and so we can $\beta$ reduce in this case, rather than reducing underneath the $\lambda$.
+This is what we do at the value-level. If we have two expressions of type \lsti{int}, and we want to check
+if they're equivalent, we just $\beta$-reduce until they're both values, and then check syntactic equality.
+
+But the problem is that we might not be dealing only with closed types. To give an example, first let
+\lsti{const_int} be the operator
+\begin{lstlisting}
+\\(X::*) => int
+\end{lstlisting}
+
+which always returns \lsti{int} when applied to anything.
+
+Then let \lsti{const_int'} be the equivalent operator
+\begin{lstlisting}
+\\(X::*) =>
+    ((\\(Y::*) => Y) [int])
+\end{lstlisting}
+
+which does the same thing but has a superfluous identity operator in its body.
+Then consider the program:
+\begin{lstlisting}
+/\ (T::(*->*)->*) =>
+\ (f:T const_int -> int) (x:T const_int') => f x
+\end{lstlisting}
+
+To check that the function application \lsti{f x} is ok, we need to check the equivalence of the types
+\lsti{T const_int} and \lsti{T const_int'}, and since we don't know what \lsti{T} is, we can't do any
+$\beta$-reductions on it. Instead, we have to check that \lsti{const_int} and \lsti{const_int'} are equivalent,
+which involves \textit{going underneath the $\lambda$}.
+
+%So we can normalize types like this:
+%
+%\begin{lstlisting}
+%let rec normalize_type (t:typ) : typ =
+%  match t with
+%  | BoolT | IntT | StrT | VarT _  -> t
+%  | FunT (t1,t2) -> FunT (normalize_type t1,
+%                          normalize_type t2)
+%  | PairT (t1,t2) -> PairT (normalize_type t1,
+%                            normalize_type t2)
+%  | ListT u -> ListT (normalize_type u)
+%  | ForallT (v,k,t') -> ForallT (v,k,normalize_type t')
+%  | TFunT (v,k,t') -> TFunT (v,k,normalize_type t')
+%  | TAppT (t1,t2) ->
+%    let t1' = normalize_type t1 in
+%    let t2' = normalize_type t2 in
+%    (match t1' with
+%     | TFunT (v,k,t1'_body) ->
+%       let subbed = sub_in_typ t1'_body v t2' in
+%       normalize_type subbed
+%     | TRecT (f,v,k1,k2,t1'_body) ->
+%       let subbed = sub_in_typ t1'_body v t2' in
+%       let subbed = sub_in_typ subbed f t1' in
+%       normalize_type subbed
+%     | _ -> TAppT (t1',t2'))
+%\end{lstlisting}
+
+\subsection{Typecase}
+
+Harper and Morrisett introduce both a value-level \lsti{typecase} form, and a type-level \lsti{Typecase} form.
+The two are analogous in that they both match on a type argument. However, the latter returns a type rather
+than a term. As a use case Harper and Morrisett give the example of an type operator which
+gives a representation for an array that depends on the type of the array elements, for more efficient use
+of memory\footnote{This is just pseudocode to motivate the idea. In my language, there has to be a branch
+for each of \lsti{int}, \lsti{bool}, \lsti{str}, \lsti{void}, functions, products, and lists, in that order. (I'll explain
+void soon).}:
+
+\begin{lstlisting}[mathescape]
+Typecase $\alpha$ of
+| bool => boolarray
+| int => intarray
+| $\tau$ => boxedarray ($\tau$)                    
+\end{lstlisting}
+
+More interestingly, there are cases in which we might want to be able to do recursion on the type argument.
+For instance we might want to represent an array of tuples as a tuple of arrays, and this requires recursion:
+\begin{lstlisting}[mathescape]
+Typerec RecArray $\alpha$ of
+| bool => boolarray
+| int => intarray
+| $\tau_1 \times \tau_2$ => RecArray[$\tau_1$] $\times$ RecArray[$\tau_2$]
+| $\tau$ => boxedarray($\tau$)
+\end{lstlisting}
+
+It's not difficult to see how to represent and implement the non-recursive \lsti{Typecase} form.
+We represent each complex branch (pairs, functions, and lists) as a function from types to types.
+So the kinding rule for \lsti{Typecase} would be\footnote{The premises for booleans, strings, lists
+are analogous to the ones given.}:
+
+\begin{prooftree}
+\AxiomC{$\Gamma \vdash \mu_i :: \kappa$}
+\AxiomC{$\Gamma \vdash \mu :: *$}
+\noLine
+\BinaryInfC{$\Gamma \vdash \mu_{\times} :: * \rightarrow * \rightarrow \kappa$}
+\noLine
+\UnaryInfC{$\Gamma \vdash \mu_{\rightarrow} :: * \rightarrow * \rightarrow \kappa$}
+\UnaryInfC{$\Gamma \vdash$ Typecase $\mu$ of $(\mu_i|\mu_{\rightarrow}|\mu_{\times}) :: \kappa$}
+\end{prooftree}
+
+To implement the recursive case, I felt that the most natural thing to do was to extend the language with
+a recursion primitive at the type level, in the same way as I had at the term-level before. The idea was that
+we could then rewrite \lsti{RecArray} as:
+\begin{lstlisting}[mathescape]
+rec \\RecArray ($\alpha$::*) :: * =>
+Typecase $\alpha$ of
+| bool => boolarray
+| int => intarray
+| $\tau_1 \times \tau_2$ => RecArray[$\tau_1$] $\times$ RecArray[$\tau_2$]
+| $\tau$ => boxedarray($\tau$)
+\end{lstlisting}
+
+I was well aware that this would lead to the possibility of infinite looping in the typechecker (i.e. typechecking would be undecidable).  For instance, with the type-level \lsti{rec}, we can write the following
+type:
+\begin{lstlisting}[mathescape]
+rec \\Loop ($\alpha$::*) :: * => Loop [$\alpha$]
+\end{lstlisting}
+But the recursion operator seemed like the most natural way to implement \lsti{Typerec}, and as a bonus, would make the type system Turing-complete and might therefore be worth exploration.
+
+I also thought that it would be easy to avoid such infinite looping, as long as calls to the recursive operator
+were structurally decreasing (which would be easy to check.). However, this turned out to be wrong. Pretty
+much any use of \lsti{Typerec} would infinite loop with this implementation strategy.
+
+For instance, the type of the subscripting function for these specially defined arrays is
+$\forall \alpha. RecArray[\alpha] \rightarrow int \rightarrow \alpha$. If we try to normalize $RecArray[\alpha]$
+in this type, after one substitution step, we have
+\begin{lstlisting}[mathescape]
+Typecase $\alpha$ of
+| bool => boolarray
+| int => intarray
+| $\tau_1 * \tau_2$ => (rec \\RecArray ...)[$\tau_1$] *
+            (rec \\RecArray ...)[$\tau_2$]
+| $\tau$ => boxedarray($\tau$)
+\end{lstlisting}
+where the ellipses mark the definition of \lsti{RecArray} itself.
+
+At the term level, this would be fine, but at the type level, we have to normalize underneath $\lambda$'s---remember that each branch is represented as a type operator---meaning we have to normalize
+\lsti[mathescape]{(rec \\RecArray ...)[$\tau_1$]}. This is identical in form to what we were trying to normalize
+in the first place, so we clearly get an infinite loop.
+
+After discovering this issue, I decided it would be best just to get rid of the type-level
+recursion primitive and implement \lsti{Typerec} as
+Harper and Morrisett do. Their kinding (or ``formation'') rule is almost the same as the one given above:
+\begin{prooftree}
+\AxiomC{$\Gamma \vdash \mu_i :: \kappa$}
+\AxiomC{$\Gamma \vdash \mu :: *$}
+\noLine
+\BinaryInfC{$\Gamma \vdash \mu_{\times} :: * \rightarrow * \rightarrow \kappa \rightarrow \kappa \rightarrow \kappa$}
+\noLine
+\UnaryInfC{$\Gamma \vdash \mu_{\rightarrow} :: * \rightarrow * \rightarrow \kappa \rightarrow \kappa \rightarrow \kappa$}
+\UnaryInfC{$\Gamma \vdash$ Typerec $\mu$ of $(\mu_i|\mu_{\rightarrow}|\mu_{\times}) :: \kappa$}
+\end{prooftree}
+The only difference is that we added extra parameters to the $\mu_{\times}$ and $\mu_{\rightarrow}$ type operators.
+These parameters represent the \textit{result of the Typerec evaluated at the given type's components}.
+
+Then the equivalence rules are\footnote{I give two of the rules here. The others are similar}:
+
+\begin{prooftree}
+\AxiomC{}
+\UnaryInfC{Typerec int of $(\mu_i|\mu_{\times}|\mu_{\rightarrow}) \equiv \mu_i$}
+\end{prooftree}
+
+\begin{prooftree}
+\AxiomC{}
+\UnaryInfC{\stackanchor{Typerec $\mu_1 \rightarrow \mu_2$ of $(\mu_i|\mu_{\times}|\mu_{\rightarrow}) \equiv$}
+           {$\mu_{\rightarrow}$ $\mu_1$  $\mu_2$
+                            (Typerec $\mu_1$ of $(\mu_i|\mu_{\times}|\mu_{\rightarrow}$))
+                            (Typerec $\mu_2$ of $(\mu_i|\mu_{\times}|\mu_{\rightarrow}$))}}
+\end{prooftree}
+
+My first attempt failed because it substituted too eagerly: the definition of the Typerec
+was substituted throughout its body even before we could tell which branch to go down.
+These new formation and equivalence rules fix that: we only substitute the Typerec when we know which branch
+to go down, thereby making progress and avoiding an infinite loop.
+
+This is the internal representation of the Typerec. The only remaining issue is to translate source code
+into this form. Specifically, for the complex-type branches, we have to find all recursive Typerec calls,
+and replace them with some fresh variable which we add as a parameter.
+
+Consider the product branch of the RecArray \lsti{Typerec} from before:
+\begin{lstlisting}[mathescape]
+Typerec RecArray $\alpha$ of
+...
+| $\tau_1 \times \tau_2$ => RecArray[$\tau_1$] * RecArray[$\tau_2$]
+\end{lstlisting}
+What we do here is find the two recursive calls to \lsti{RecArray}, replace each of them with a fresh variables and add these variables as parameters to our type-operator, like so:
+\begin{lstlisting}[mathescape]
+\\$\tau_1$ $\tau_2$ $\rho_1$ $\rho_2$ => $\rho_1$ * $\rho_2$
+\end{lstlisting}
+
+To accomplish this, I wrote a sort of "generalized substitution" function, which searches for any given subexpression and replaces it with another given expression.
+
+\subsection{Void}
+We're nearly there. The last step is to add a $void$ type, which is the empty type.
+This was a really trivial extension to the language since nothing ever has this type!
+The typing rules for the void type are:
+
+\subsection{Encoding Typeclasses}
+Returning to the to_string function from before, we want the typechecker to prevent us from calling
+it on a function argument. We are now equipped with the tools to do this.
+Define a type operator which maps everything to itself, except functions, which it maps to void.
+\begin{lstlisting}
+Typerec S :: * -> *
+ | int => int
+ | bool => bool
+ | str => str
+ | void => void
+ | t1 -> t2 => void
+ | t1 * t2 => S[t1] * S[t2]
+ | list t => list (S[t])
+end
+\end{lstlisting}
+
+Then define to_string as:
+
+\begin{lstlisting}[mathescape]
+rec /\ to_string (a::*) : forall a. S [a] -> str =>
+    typecase [t. S[t] -> str] a of
+    | int => int2string
+    | bool => bool2string
+    | str => id [str]
+    | void => (\ (x:void) => "")
+    | t1 -> t2 => (\ (x:void) => "")
+    | t1 * t2 => (\ (p:S[t1*t2]) => 
+                    "(" ++ (to_string [S[t1]] (fst p)) ++ "," ++
+                           (to_string [S[t2]] (snd p)) ++ ")")
+    | list t => (\ (xs:S[list t]) =>
+                   fold [S[t]] [str] 
+                        (\ (v:S[t]) (acc:str) =>
+                           (to_string [S[t]] v) ++ acc) "")
+    end
+\end{lstlisting}
+
+Since to_string has type $\forall \alpha. S[\alpha] \rightarrow str$, if $\alpha$ is a function type then
+\lsti{to_string}$[\alpha]$ will be of type $void \rightarrow str$, and any call to it will fail to typecheck.
+
+\appendix
+\section{Appendix}
+\subsection{Inference rules}
+Throughout this paper, I use a simple notation for expressing relations and their inference rules.
+Suppose we wanted to define the less-than-or-equal-to ($\leq$) relation on $\mathbb{N}$.
+This relation is infinite,
+so we can't describe it just by listing all the pairs of numbers that satisfy it.
+We instead describe the relation with a list of axioms and inference rules. So, we can say that
+forall $n$, $n \leq n$; and we can say that if $n \leq m$ then $n \leq m+1$. These two rules fully express the $\leq$ relation.
+The Gentzen notation for these rules is:
+
+\begin{prooftree}
+\AxiomC{}
+\UnaryInfC{$n \leq n$}
+\end{prooftree}
+
+\begin{prooftree}
+\AxiomC{$n \leq m$}
+\UnaryInfC{$n \leq m+1$}
+\end{prooftree}
+
+So to write down an inference rule, we put our assumptions above the line (and there may be more than one,
+separated by spaces), and our conclusion (usually just one) below the line.
+
+\subsection{Language Syntax Reference}
 
 \bstctlcite{bstctl:etal, bstctl:nodash, bstctl:simpurl}
 \bibliographystyle{IEEEtranS}
