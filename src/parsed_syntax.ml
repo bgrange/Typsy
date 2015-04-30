@@ -67,3 +67,11 @@ type exp =
     | TRec of variable * (variable * kind) list * typ * exp *)
   | TApp of exp * typ
               deriving (Show)
+
+
+type prog_unit =
+  | Anon of exp
+  | Value of exp
+  | Type of typ
+
+type prog = prog_unit list
