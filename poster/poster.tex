@@ -1,0 +1,419 @@
+\documentclass[portrait,final,paperwidth=40in,paperheight=40in]{baposter}
+%\documentclass[a4shrink,portrait,final]{baposter}
+% Usa a4shrink for an a4 sized paper.
+
+\tracingstats=2
+
+\usepackage{calc}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{relsize}
+\usepackage{multirow}
+%\usepackage{bm}
+
+\usepackage{graphicx}
+\usepackage{multicol}
+
+\usepackage{pgfbaselayers}
+\pgfdeclarelayer{background}
+\pgfdeclarelayer{foreground}
+\pgfsetlayers{background,main,foreground}
+
+%\usepackage{times}
+%\usepackage{helvet}
+%\usepackage{bookman}
+%\usepackage{palatino}
+\usepackage{bussproofs}
+\usepackage{listings}
+
+\usepackage[scaled]{beramono}
+\usepackage[T1]{fontenc}
+
+\newcommand{\captionfont}{\footnotesize}
+
+\selectcolormodel{cmyk}
+
+\graphicspath{{images/}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Multicol Settings
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\setlength{\columnsep}{0.7em}
+\setlength{\columnseprule}{0mm}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Save space in lists. Use this after the opening of the list
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\newcommand{\compresslist}{%
+\setlength{\itemsep}{1pt}%
+\setlength{\parskip}{0pt}%
+\setlength{\parsep}{0pt}%
+}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% Begin of Document
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{document}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% Here starts the poster
+%%%---------------------------------------------------------------------------
+%%% Format it to your taste with the options
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Define some colors
+\definecolor{silver}{cmyk}{0,0,0,0.3}
+\definecolor{yellow}{cmyk}{0,0,0.9,0.0}
+\definecolor{reddishyellow}{cmyk}{0,0.22,1.0,0.0}
+\definecolor{black}{cmyk}{0,0,0.0,1.0}
+\definecolor{darkYellow}{cmyk}{0,0,1.0,0.5}
+\definecolor{darkSilver}{cmyk}{0,0,0,0.1}
+
+\definecolor{lightyellow}{cmyk}{0,0,0.3,0.0}
+\definecolor{lighteryellow}{cmyk}{0,0,0.1,0.0}
+\definecolor{lighteryellow}{cmyk}{0,0,0.1,0.0}
+\definecolor{lightestyellow}{cmyk}{0,0,0.05,0.0}
+
+\lstset{language=Caml,
+        basicstyle=\ttfamily\small,
+        morekeywords={typecase,Typerec,Typecase}}
+\newcommand{\lsti}{\lstinline}
+
+%%
+%\typeout{Poster Starts}
+%\background{
+%  \begin{tikzpicture}[remember picture,overlay]%
+%    \draw (current page.north west)+(-2em,2em) node[anchor=north west] {\includegraphics[height=1.1\textheight]{silhouettes_background}};
+%  \end{tikzpicture}%
+%}
+
+\newlength{\leftimgwidth}
+\begin{poster}%
+  % Poster Options
+  {
+  % Show grid to help with alignment
+  grid=false,
+  % Column spacing
+  colspacing=1em,
+  % Color style
+  bgColorOne=lighteryellow,
+  bgColorTwo=lightestyellow,
+  borderColor=reddishyellow,
+  headerColorOne=yellow,
+  headerColorTwo=reddishyellow,
+  headerFontColor=black,
+  boxColorOne=lightyellow,
+  boxColorTwo=lighteryellow,
+  % Format of textbox
+  textborder=roundedleft,
+%  textborder=rectangle,
+  % Format of text header
+  eyecatcher=false,
+  headerborder=open,
+  headerheight=0.08\textheight,
+  headershape=roundedright,
+  headershade=plain,
+  boxshade=plain,
+%  background=shade-tb,
+  background=plain,
+  linewidth=2pt
+  }
+  {}
+    % Title
+  {Encoding Typeclasses in System F$_{\omega}$}
+  % Authors
+  {Ben Grange, with Prof. David Walker}
+  % University logo
+  {% The makebox allows the title to flow into the logo, this is a hack because of the L shaped logo.
+    \makebox[8em][r]{%
+      \begin{minipage}{16em}
+        \hfill
+        \includegraphics[height=2em]{pton_logo}
+      \end{minipage}
+    }
+  }
+
+  \tikzstyle{light shaded}=[top color=baposterBGtwo!30!white,bottom color=baposterBGone!30!white,shading=axis,shading angle=30]
+
+  % Width of left inset image
+     \setlength{\leftimgwidth}{0.78em+8.0em}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% Now define the boxes that make up the poster
+%%%---------------------------------------------------------------------------
+%%% Each box has a name and can be placed absolutely or relatively.
+%%% The only inconvenience is that you can only specify a relative position 
+%%% towards an already declared box. So if you have a box attached to the 
+%%% bottom, one to the top and a third one which should be in between, you 
+%%% have to specify the top and bottom boxes before you specify the middle 
+%%% box.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %
+    % A coloured circle useful as a bullet with an adjustably strong filling
+    \newcommand{\colouredcircle}[1]{%
+      \tikz{\useasboundingbox (-0.2em,-0.32em) rectangle(0.2em,0.32em); \draw[draw=black,fill=baposterBGone!80!black!#1!white,line width=0.03em] (0,0) circle(0.18em);}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  \begin{posterbox}[name=overview,row=0,column=0]{Overview}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   Typeclasses are a powerful construct in Haskell for defining functions
+   differently on the type of an argument (ad-hoc polymorphism).
+   
+   In GHC, typeclasses are implemented with ``dictionary-passing''.
+   I investigated an alternative approach---encoding typeclasses in terms of the
+   more the primitive typecase and Typerec constructs---by designing a small
+   language from scratch. 
+  \vspace{0.3em}
+
+ \end{posterbox}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  \begin{posterbox}[name=untyped,below=overview]{Untyped Lambda Calculus}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ 
+  The untyped lambda calculus is the basis for everything. Terms are either
+  variables, $\lambda$ abstractions, or function applications.
+  The system can be described by these rules:
+
+  \begin{prooftree}
+  \AxiomC{$e_1 \rightarrow e_1'$}
+  \UnaryInfC{$e_1 e_2 \rightarrow e_1'e_2$}
+  \end{prooftree}
+
+  \begin{prooftree}
+  \AxiomC{value $v$}
+  \AxiomC{$e_2 \rightarrow e_2'$}
+  \BinaryInfC{$v \, e_2 \rightarrow v \, e_2'$}
+  \end{prooftree}
+
+  \begin{prooftree}
+  \AxiomC{value $v$}
+  \UnaryInfC{$(\lambda x.e_1)v \rightarrow [x \mapsto v]e_1$}
+  \end{prooftree}   
+
+  An example computation:
+
+  \begin{lstlisting}[mathescape]
+
+     ($\lambda$xy.y)($\lambda$xy.x)($\lambda$xy.xy) $\rightarrow$ ($\lambda$y.y)($\lambda$xy.xy)
+                            $\rightarrow$ $\lambda$xy.xy
+
+  \end{lstlisting}
+
+  We can do any computation in this system, but it's highly inconvenient.
+
+  \end{posterbox}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  \begin{posterbox}[name=simple,below=untyped]{Simply Typed Lambda Calculus}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    
+  The language was enriched with the primitive types \lsti{Int}, \lsti{Bool}, \lsti{Str},
+  \lsti{List}, and \lsti{Void}. (\lsti{Void} will become important later).
+
+  Primitive types allow us to compute more naturally, but they create the possibility
+  of stuck (i.e. crashed) programs. The typechecker to statically guarantee type safety.
+
+  The fundamental typing rules are:
+
+
+  \begin{prooftree}
+  \AxiomC{$x \in \Gamma$}
+  \UnaryInfC{$\Gamma \vdash x : T$}
+  \end{prooftree}
+
+  \begin{prooftree}
+  \AxiomC{$\Gamma \cup \{x:T_1\} \vdash e:T_2$}
+  \UnaryInfC{$\Gamma \vdash (\lambda x:T_1.e) : T_1 \rightarrow T_2$}
+  \end{prooftree}
+
+  \begin{prooftree}
+  \AxiomC{$\Gamma \vdash e_1 : T_1 \rightarrow T_2$}
+  \AxiomC{$\Gamma \vdash e_2 : T_1$}
+  \BinaryInfC{$\Gamma \vdash e_1 e_2 : T_2$}
+  \end{prooftree}
+
+  \vspace{0.3em}
+  \end{posterbox}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  \begin{posterbox}[name=poly,column=1]{System F}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  
+  In STLC, we have no polymorphism.
+
+  We can write a map function, but it must be specific to a pair of types:
+
+  \begin{lstlisting}
+    let rec map (f:Int -> Str)
+                (l:List Int) : List Str =
+    ...
+  \end{lstlisting}
+
+  To map over a list of any other type, we have to define a new function:
+
+  \begin{center}
+    \line(1,0){250}
+  \end{center}
+
+  To implement parametric polymorphism, I added type functions, from types
+  to values. Now, map can be written as one such function:
+
+  \begin{lstlisting}
+    let rec map (A::*) (B::*)
+                (f:A -> B) (l:List A) : List B =
+    ...
+  \end{lstlisting}
+
+  where \lsti{(A::*)} means that \lsti{A} is a type parameter.
+
+  We can then call \lsti{map} like so:
+
+  \begin{lstlisting}[mathescape]
+    map [Int] [Int] ($\lambda$(x:Int).x+1) [1,2,3]
+  \end{lstlisting}
+
+  \end{posterbox}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  \begin{posterbox}[name=tyop,column=1,below=poly]{System F_$\omega$}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+    
+  For the purpose of implementing typeclasses, I added type operators,
+  which are functions from types to types.
+
+  For instance, to create an association-list type,
+  we could use the type operator:
+
+  \begin{lstlisting}[mathescape]
+    $\lambda$(X::*)(Y::*).List (X $\times$ Y)
+  \end{lstlisting}
+
+  Base types have kind $\ast$, while
+  this type operator has ``higher kind'' $\ast \rightarrow \ast$.
+
+  \end{posterbox}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  \begin{posterbox}[name=tcase,column=1,below=tyop]{typecase/Typerec}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+    
+  The \lsti{typecase} and \lsti{Typerec} constructs allow us to do
+  runtime type analysis in a typesafe manner.
+
+  So, to define a generic equality function:
+
+  \begin{lstlisting}[mathescape]
+  let eq (A::*) : A $\rightarrow$ A $\rightarrow$ Bool =
+  typecase A of
+  | Int $\Rightarrow$ inteq
+  | T$_1$ $\rightarrow$ T$_2$ $\Rightarrow$ $\lambda$ f1 f2.false
+  | T$_1$ $\ast$ T$_2$ $\Rightarrow$ $\lambda$ (x1,y1) (x2,y2).(eq [T$_1$] x1 x2) and
+                                 (eq [T$_2$] y1 y2)
+
+  \end{lstlisting}
+
+  \lsti{Typerec} allows us to do the same thing at the type-level.
+  So to define a different representation of arrays depending on the
+  array element type:
+
+  \begin{lstlisting}[mathescape]
+    Typerec RecArray $\alpha$ of
+    | Bool => Boolarray
+    | Int => Intarray
+    | $\tau_1 \times \tau_2$ => RecArray[$\tau_1$] $\times$ RecArray[$\tau_2$]
+    | $\tau$ => boxedarray($\tau$)
+  \end{lstlisting}
+
+  Note that we can do recursion on the type, but the typesystem remains
+  decideable.
+  \end{posterbox}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  \begin{posterbox}[name=tclass,column=2]{Typeclasses in Haskell}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+    
+  Typeclasses allow us to overload functions easily.
+  We define the function we want to overload:
+
+  \begin{lstlisting}[language=Haskell]
+    class Eq a where
+    (==) :: a -> a -> Bool
+  \end{lstlisting}
+
+  Then we define it differently on different types:
+  \begin{lstlisting}[language=Haskell]
+    instance Eq a => Eq [a] where
+    xs == ys = all (\ (x,y) -> x == y) (zip xs ys)
+  \end{lstlisting}
+
+  \begin{lstlisting}[language=Haskell,mathescape]
+    instance Eq a => Eq b => Eq (a $\times$ b) where
+    (x1,y1) == (x2,y2) = x1 == x2 and y1 == y2
+  \end{lstlisting}
+
+   If we define a new type that isn't an instance of \lsti[language=Haskell]{Eq}
+  and try to test it for equality, we'll get a type error.
+  So there are two critical features here that we want to emulate:
+  overloading (ad-hoc polymorphism), and partiality.
+
+  \end{posterbox}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  \begin{posterbox}[name=tclassenc,column=2,below=tclass]{Encoding Typeclasses}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+    The \lsti{typecase} construct gives us overloading really easily.
+
+    We can then use \lsti{Void} to achieve partiality.
+
+    Say we want to define an equality function for all types but function types
+    (and types containing function types, e.g. pairs of functions)
+
+    Define a \lsti{Typerec} which maps every type to itself, except functions
+    which go to void.
+
+    \begin{lstlisting}[mathescape]
+      Typerec Eq [X] :: * of
+      | Int $\Rightarrow$ Int
+      | Bool $\Rightarrow$ Bool
+      | Str $\Rightarrow$ Str
+      | Void $\Rightarrow$ Void
+      | S $\rightarrow$ T $\Rightarrow$ Void
+      | S $\times$ T $\Rightarrow$ (Eq [S]) $\times$ (Eq [T])
+      | List S $\Rightarrow$ List (Eq [S])
+      end
+    \end{lstlisting}
+
+    Then we can define our equality function like so:
+
+    \begin{lstlisting}[mathescape]
+    let rec eq (A::*) : Eq [A] $\rightarrow$ Eq [A] $\rightarrow$ Bool =
+      typecase A of
+      | Int $\Rightarrow$ inteq
+      | Bool $\Rightarrow$ booleq
+      | Str $\Rightarrow$ streq
+      | Void $\Rightarrow$ $\lambda$ v1 v2. false
+      | S $\rightarrow$ T $\Rightarrow$ $\lambda$ v1 v2. false
+      | S $\times$ T $\Rightarrow$
+             $\lambda$ p1 p2. eq [S] (fst p1) (fst p2) and
+                      eq [T] (snd p1) (snd p2)
+      | List S $\Rightarrow$ eq_list [Eq[S]] (eq [S])
+      end
+    \end{lstlisting}
+    
+  Typeclasses as written above could easily be translated into this form, although I did not do so.
+
+  \end{posterbox}
+
+
+\end{poster}
+
+\end{document}
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: t
+%%% End:

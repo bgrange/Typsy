@@ -89,6 +89,8 @@ let to_kind (k_opt:kind option) : kind =
 %token VALUE
 %token USE
 %token SEMI
+%token LBRACE
+%token RBRACE
 %start <Parsed_syntax.exp> parse_exp
 %start <Parsed_syntax.typ> parse_typ
 %start <Parsed_syntax.prog> parse_prog
@@ -243,4 +245,5 @@ exp4:
         | FALSE                         { Constant (Bool false) }
         | n = INT                       { Constant (Int n) }
         | s = STR                       { Constant (Str s) }
+        | LBRACE; RBRACE;               { Constant Emp }
         ;

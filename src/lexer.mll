@@ -20,6 +20,7 @@ rule read =
          parse
        | white    { read lexbuf }
        | newline  { next_line lexbuf; read lexbuf }
+       | "//"     { read_comment lexbuf }
        | int      { INT (int_of_string (Lexing.lexeme lexbuf)) }
        | '"'      { read_string (Buffer.create 100) lexbuf }
        | "true"   { TRUE }
@@ -38,6 +39,8 @@ rule read =
        | ']'      { RBRACK }	     
        | '('      { LPAREN }
        | ')'      { RPAREN }
+       | '{'      { LBRACE }
+       | '}'      { RBRACE }
        | ':'      { COLON }
        | ';'      { SEMI }
        | '*'      { STAR }	     
@@ -85,6 +88,8 @@ rule read =
        | _ { raise (SyntaxError ("Unexpected char: " ^ Lexing.lexeme lexbuf)) }
        | eof      { EOF }
 
+(* read_string was borrowed from
+https://realworldocaml.org/v1/en/html/parsing-with-ocamllex-and-menhir.html*)
 and read_string buf =
   parse
 | '"'       { STR (Buffer.contents buf) }
@@ -102,3 +107,8 @@ and read_string buf =
   }
 | _ { raise (SyntaxError ("Illegal string character: " ^ Lexing.lexeme lexbuf)) }
 | eof { raise (SyntaxError ("String is not terminated")) }
+
+and read_comment =
+  parse
+| newline  { next_line lexbuf; read lexbuf }
+| _        { read_comment lexbuf }
